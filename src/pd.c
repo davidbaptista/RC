@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <ctype.h>
 
 #define DEFAULT_CLIENT_PORT "57002"
 #define DEFAULT_SERVER_PORT "58002"
@@ -16,35 +17,30 @@ char *clientPort = NULL;
 char *serverIP = NULL;
 char *serverPort = NULL;
 
-static void parseArgs(long argc, char* const argv[]) {
-    switch (argc) {
-    case 2:
-        clientIP = argv[1];
-        clientPort = DEFAULT_CLIENT_PORT;
-        serverIP = clientIP;
-        serverPort = DEFAULT_SERVER_PORT;
-        break;
-    case 4:
-        clientIP = argv[1];
-        clientPort = argv[3];
-        serverIP = clientIP;
-        serverPort = DEFAULT_SERVER_PORT;
-        break;
-    case 6:
-        clientIP = argv[1];
-        clientPort = argv[3];
-        serverIP = argv[5];
-        serverPort = DEFAULT_SERVER_PORT;
-        break;
-    case 8:
-        clientIP = argv[1];
-        clientPort = argv[3];
-        serverIP = argv[5];
-        serverPort = argv[7];
-        break;
-    default:
-        break;
+static void parseArgs (long argc, char* const argv[]){
+
+    char c;
+
+    clientIP = argv[1];
+    clientPort = DEFAULT_CLIENT_PORT;
+    serverIP = argv[1];
+    serverPort = DEFAULT_SERVER_PORT;
+
+    while ((c = getopt(argc, argv, "d:n:p:")) != -1){
+        switch (c) {
+            case 'd':
+                clientPort = optarg;
+                break;
+            case 'n':
+                serverIP = optarg;
+                break;
+            case 'p':
+                serverPort = optarg;
+                break;
+        }
     }
+
+    printf("%s %s %s %s", clientIP, clientPort, serverIP, serverPort);
 }
 
 int main(int argc, char *argv[]) {
