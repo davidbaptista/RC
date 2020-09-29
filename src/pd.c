@@ -47,9 +47,10 @@ int main(int argc, char *argv[]) {
     char buffer[128];
     char host[NI_MAXHOST], service[NI_MAXSERV];
     struct sockaddr_in addr;
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res, *p;
     ssize_t n;
     socklen_t addrlen;
+	int i;
 
 
     parseArgs(argc, argv);
@@ -59,13 +60,14 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    memset(&hints,0,sizeof hints);
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family=AF_INET; // IPv4
     hints.ai_socktype=SOCK_DGRAM; // UDP
+	hints.ai_flags=AI_CANONNAME;
 
     if(getaddrinfo(serverIP, serverPort, &hints, &res) != 0) {
         exit(1);
-    }
+    }	
 
     while(fgets(line, sizeof(line), stdin) != NULL) {
         char command[128];
@@ -78,18 +80,22 @@ int main(int argc, char *argv[]) {
             break;
         }
         else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
-			puts("uhm");
+
         }
     }
 
+	char bf[128];
+	sprintf(bf, "REG 92446 12345678 %s %s", clientIP, clientPort);
+	puts(bf);
 
-    n = sendto(fd, "Hello!\n", 7, 0, res->ai_addr, res->ai_addrlen);
+    n = sendto(fd, bf, 14, 0, res->ai_addr, res->ai_addrlen);
     if(n == -1) {
 		exit(1);
 	}
 
     addrlen = sizeof(addr);
     n = recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+	buffer[n] = '\0';
 
     if(n == -1) {
 		exit(1);
@@ -97,10 +103,8 @@ int main(int argc, char *argv[]) {
 
     write(1, "echo: ", 6); 
 	write(1, buffer, n);
-    write(1, buffer, n);
 
     freeaddrinfo(res);
-
     close(fd);
     exit(0);
 
