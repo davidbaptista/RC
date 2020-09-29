@@ -39,8 +39,6 @@ static void parseArgs (long argc, char* const argv[]){
                 break;
         }
     }
-
-    printf("%s %s %s %s", clientIP, clientPort, serverIP, serverPort);
 }
 
 int main(int argc, char *argv[]) {
@@ -83,15 +81,20 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    /*n=sendto(fd,"Hello!\n",7,0,res->ai_addr,res->ai_addrlen);
+
+    n = sendto(fd,"Hello!\n", 7, 0, res->ai_addr, res->ai_addrlen);
     if(n==-1) exit(1);
 
     addrlen=sizeof(addr);
-    n=recvfrom(fd,buffer,128,0,(struct sockaddr*)&addr,&addrlen);
-    if(n==-1) exit(1);
+    n=recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
 
-    write(1,"echo: ",6); write(1,buffer,n);
-    write(1,buffer,n);*/
+    if(n==-1) {
+		exit(1);
+	}
+
+    write(1,"echo: ",6); 
+	write(1,buffer,n);
+    write(1,buffer,n);
 
     freeaddrinfo(res);
 
