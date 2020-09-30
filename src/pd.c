@@ -10,8 +10,8 @@
 #include <netdb.h>
 #include <ctype.h>
 
-#define DEFAULT_CLIENT_PORT "57002"
-#define DEFAULT_SERVER_PORT "58002"
+#define DEFAULT_PD_PORT "57002"
+#define DEFAULT_AS_PORT "58002"
 
 #define bool int
 #define true 1
@@ -19,30 +19,29 @@
 
 #define max(A, B) ((A) >= (B)?(A):(B))
 
-char *clientIP = NULL;
-char *clientPort = NULL;
-char *serverIP = NULL;
-char *serverPort = NULL;
+char *pdIP = NULL;
+char *pdPort = NULL;
+char *asIP = NULL;
+char *asPort = NULL;
 
-static void parseArgs (long argc, char* const argv[]){
-
+static void parseArgs (long argc, char* const argv[]) {
     char c;
 
-    clientIP = argv[1];
-    clientPort = DEFAULT_CLIENT_PORT;
-    serverIP = argv[1];
-    serverPort = DEFAULT_SERVER_PORT;
+    pdIP = argv[1];
+    pdPort = DEFAULT_PD_PORT;
+    asIP = argv[1];
+    asPort = DEFAULT_AS_PORT;
 
     while ((c = getopt(argc, argv, "d:n:p:")) != -1){
         switch (c) {
             case 'd':
-                clientPort = optarg;
+                pdPort = optarg;
                 break;
             case 'n':
-                serverIP = optarg;
+                asIP = optarg;
                 break;
             case 'p':
-                serverPort = optarg;
+                asPort = optarg;
                 break;
         }
     }
@@ -76,7 +75,7 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype=SOCK_DGRAM; // UDP
 	hints.ai_flags=AI_CANONNAME;
 
-    if(getaddrinfo(serverIP, serverPort, &hints, &res) != 0) {
+    if(getaddrinfo(asIP, asPort, &hints, &res) != 0) {
         exit(1);
     }	
 
@@ -124,7 +123,7 @@ int main(int argc, char *argv[]) {
                 }
             }
             else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
-                sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, clientIP, clientPort);
+                sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, pdIP, pdPort);
 
                 n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
                 if(n == -1) {
