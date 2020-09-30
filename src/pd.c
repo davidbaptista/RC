@@ -49,7 +49,7 @@ static void parseArgs (long argc, char* const argv[]){
 }
 
 int main(int argc, char *argv[]) {
-    int serverfd, inputfd;
+    int serverfd, inputfd = 0;
 	int errcode;
     char line[128];
     char buffer[128];
@@ -59,6 +59,11 @@ int main(int argc, char *argv[]) {
 	fd_set fds;	
     ssize_t n;
     socklen_t addrlen;
+    char msg[128];
+    char command[128];
+    char arg1[16], arg2[16];
+    int c;
+    int counter;
 
 
     parseArgs(argc, argv);
@@ -78,64 +83,77 @@ int main(int argc, char *argv[]) {
     }	
 
 	bool reg = false; // checks whether or not there already is a registered user
-    while(fgets(line, sizeof(line), stdin) != NULL) {
-		char msg[128];
-        char command[128];
-        char arg1[16], arg2[16];
-        int c;
 
-        c = sscanf(line, "%s %s %s", command, arg1, arg2);
+    FD_ZERO(&fds);
+    FD_SET(serverfd, &fds);
+    FD_SET(inputfd, &fds);
 
-        if(strcmp(command, "exit") == 0) {
-			if(reg) {
-				sprintf(msg, "UNR %s %s\n", arg1, arg2);
+    while (true){
+        counter = select(serverfd, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
 
-				n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
-				if(n == -1) {
-					exit(1);
-				}
-
-				addrlen = sizeof(addr);
-				n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
-				buffer[n] = '\0';
-
-				if(n == -1) {
-					exit(1);
-				}
-
-				if(!strcmp(buffer, "RUN OK\n")) {
-					reg = false;
-				}
-
-				write(1, "echo: ", 6); 
-				write(1, buffer, n);
-			}
-
-            break;
+        if (counter <= 0) {
+            exit(1);
         }
-        else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
-			sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, clientIP, clientPort);
 
-			n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
-			if(n == -1) {
-				exit(1);
-			}
+        if(FD_ISSET(inputfd, &fds)){
+            fgets(line, sizeof(line), stdin);
 
-			addrlen = sizeof(addr);
-			n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
-			buffer[n] = '\0';
+            c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
-			if(n == -1) {
-				exit(1);
-			}
+            if(strcmp(command, "exit") == 0) {
+                if(reg) {
+                    sprintf(msg, "UNR %s %s\n", arg1, arg2);
 
-			if(!strcmp(buffer, "RRG OK\n")) {
-				reg = true;
-			}
-			printf("bool: %d\n", reg);
+                    n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+                    if(n == -1) {
+                        exit(1);
+                    }
 
-			write(1, "echo: ", 6); 
-			write(1, buffer, n);
+                    addrlen = sizeof(addr);
+                    n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+                    buffer[n] = '\0';
+
+                    if(n == -1) {
+                        exit(1);
+                    }
+
+                    if(!strcmp(buffer, "RUN OK\n")) {
+                        reg = false;
+                    }
+
+                    write(1, "echo: ", 6); 
+                    write(1, buffer, n);
+                }
+
+                break;
+            }
+            else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
+                sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, clientIP, clientPort);
+
+                n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+                if(n == -1) {
+                    exit(1);
+                }
+
+                addrlen = sizeof(addr);
+                n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+                buffer[n] = '\0';
+
+                if(n == -1) {
+                    exit(1);
+                }
+
+                if(!strcmp(buffer, "RRG OK\n")) {
+                    reg = true;
+                }
+                printf("bool: %d\n", reg);
+
+                write(1, "echo: ", 6); 
+                write(1, buffer, n);
+            }
+        }
+        if(FD_ISSET(serverfd, &fds)){
+
         }
     }
 
