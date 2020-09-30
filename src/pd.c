@@ -2,10 +2,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 #include <netdb.h>
 #include <ctype.h>
 
@@ -15,6 +16,8 @@
 #define bool int
 #define true 1
 #define false 0
+
+#define max(A, B) ((A) >= (B)?(A):(B))
 
 char *clientIP = NULL;
 char *clientPort = NULL;
@@ -46,20 +49,22 @@ static void parseArgs (long argc, char* const argv[]){
 }
 
 int main(int argc, char *argv[]) {
-    int fd, errcode;
+    int serverfd, inputfd;
+	int errcode;
     char line[128];
     char buffer[128];
     char host[NI_MAXHOST], service[NI_MAXSERV];
     struct sockaddr_in addr;
     struct addrinfo hints, *res, *p;
+	fd_set fds;	
     ssize_t n;
     socklen_t addrlen;
 
 
     parseArgs(argc, argv);
 
-    fd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
-    if(fd == -1) {
+    serverfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
+    if(serverfd == -1) {
         exit(1);
     }
 
@@ -72,10 +77,10 @@ int main(int argc, char *argv[]) {
         exit(1);
     }	
 
-	bool reg = false;
+	bool reg = false; // checks whether or not there already is a registered user
     while(fgets(line, sizeof(line), stdin) != NULL) {
-        char command[128];
 		char msg[128];
+        char command[128];
         char arg1[16], arg2[16];
         int c;
 
@@ -85,13 +90,13 @@ int main(int argc, char *argv[]) {
 			if(reg) {
 				sprintf(msg, "UNR %s %s\n", arg1, arg2);
 
-				n = sendto(fd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+				n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
 				if(n == -1) {
 					exit(1);
 				}
 
 				addrlen = sizeof(addr);
-				n = recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+				n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
 				buffer[n] = '\0';
 
 				if(n == -1) {
@@ -111,13 +116,13 @@ int main(int argc, char *argv[]) {
         else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
 			sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, clientIP, clientPort);
 
-			n = sendto(fd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+			n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
 			if(n == -1) {
 				exit(1);
 			}
 
 			addrlen = sizeof(addr);
-			n = recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+			n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
 			buffer[n] = '\0';
 
 			if(n == -1) {
@@ -135,7 +140,7 @@ int main(int argc, char *argv[]) {
     }
 
     freeaddrinfo(res);
-    close(fd);
+    close(serverfd);
     exit(0);
 
 }
