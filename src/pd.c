@@ -12,6 +12,10 @@
 #define DEFAULT_CLIENT_PORT "57002"
 #define DEFAULT_SERVER_PORT "58002"
 
+#define bool int
+#define true 1
+#define false 0
+
 char *clientIP = NULL;
 char *clientPort = NULL;
 char *serverIP = NULL;
@@ -50,7 +54,6 @@ int main(int argc, char *argv[]) {
     struct addrinfo hints, *res, *p;
     ssize_t n;
     socklen_t addrlen;
-	int i;
 
 
     parseArgs(argc, argv);
@@ -69,21 +72,46 @@ int main(int argc, char *argv[]) {
         exit(1);
     }	
 
+	bool reg = false;
     while(fgets(line, sizeof(line), stdin) != NULL) {
         char command[128];
+		char msg[128];
         char arg1[16], arg2[16];
         int c;
 
         c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
         if(strcmp(command, "exit") == 0) {
+			if(reg) {
+				sprintf(msg, "UNR %s %s\n", arg1, arg2);
+
+				n = sendto(fd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+				if(n == -1) {
+					exit(1);
+				}
+
+				addrlen = sizeof(addr);
+				n = recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+				buffer[n] = '\0';
+
+				if(n == -1) {
+					exit(1);
+				}
+
+				if(!strcmp(buffer, "RUN OK\n")) {
+					reg = false;
+				}
+
+				write(1, "echo: ", 6); 
+				write(1, buffer, n);
+			}
+
             break;
         }
         else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
-			char msg[128];
-			sprintf(msg, "REG %s %s %s %s", arg1, arg2, clientIP, clientPort);
+			sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, clientIP, clientPort);
 
-			 n = sendto(fd, msg, 14, 0, res->ai_addr, res->ai_addrlen);
+			n = sendto(fd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
 			if(n == -1) {
 				exit(1);
 			}
@@ -95,6 +123,11 @@ int main(int argc, char *argv[]) {
 			if(n == -1) {
 				exit(1);
 			}
+
+			if(!strcmp(buffer, "RRG OK\n")) {
+				reg = true;
+			}
+			printf("bool: %d\n", reg);
 
 			write(1, "echo: ", 6); 
 			write(1, buffer, n);
