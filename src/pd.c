@@ -80,29 +80,26 @@ int main(int argc, char *argv[]) {
             break;
         }
         else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
+			char msg[128];
+			sprintf(msg, "REG %s %s %s %s", arg1, arg2, clientIP, clientPort);
 
+			 n = sendto(fd, msg, 14, 0, res->ai_addr, res->ai_addrlen);
+			if(n == -1) {
+				exit(1);
+			}
+
+			addrlen = sizeof(addr);
+			n = recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+			buffer[n] = '\0';
+
+			if(n == -1) {
+				exit(1);
+			}
+
+			write(1, "echo: ", 6); 
+			write(1, buffer, n);
         }
     }
-
-	char bf[128];
-	sprintf(bf, "REG 92446 12345678 %s %s", clientIP, clientPort);
-	puts(bf);
-
-    n = sendto(fd, bf, 14, 0, res->ai_addr, res->ai_addrlen);
-    if(n == -1) {
-		exit(1);
-	}
-
-    addrlen = sizeof(addr);
-    n = recvfrom(fd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
-	buffer[n] = '\0';
-
-    if(n == -1) {
-		exit(1);
-	}
-
-    write(1, "echo: ", 6); 
-	write(1, buffer, n);
 
     freeaddrinfo(res);
     close(fd);
