@@ -49,21 +49,19 @@ static void parseArgs (long argc, char* const argv[]){
 }
 
 int main(int argc, char *argv[]) {
-    int serverfd, inputfd = 0;
-	int errcode;
-    char line[128];
-    char buffer[128];
-    char host[NI_MAXHOST], service[NI_MAXSERV];
-    struct sockaddr_in addr;
-    struct addrinfo hints, *res, *p;
-	fd_set fds;	
-    ssize_t n;
-    socklen_t addrlen;
-    char msg[128];
-    char command[128];
-    char arg1[16], arg2[16];
     int c;
     int counter;
+    int serverfd, inputfd = 0;
+    char msg[128];
+    char line[128];
+    char buffer[128];
+    char command[128];
+    char arg1[16], arg2[16];
+    struct sockaddr_in addr;
+    struct addrinfo hints, *res;
+    ssize_t n;
+	fd_set fds;	
+    socklen_t addrlen;
 
 
     parseArgs(argc, argv);
@@ -124,8 +122,6 @@ int main(int argc, char *argv[]) {
                     write(1, "echo: ", 6); 
                     write(1, buffer, n);
                 }
-
-                break;
             }
             else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
                 sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, clientIP, clientPort);
@@ -146,7 +142,6 @@ int main(int argc, char *argv[]) {
                 if(!strcmp(buffer, "RRG OK\n")) {
                     reg = true;
                 }
-                printf("bool: %d\n", reg);
 
                 write(1, "echo: ", 6); 
                 write(1, buffer, n);

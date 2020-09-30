@@ -1,5 +1,5 @@
 CC = gcc
-CLFAGS =
+CLFAGS = -Wall
 SOURCES = pd.c
 EXECUTABLES = pd
 
