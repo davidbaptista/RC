@@ -96,13 +96,14 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in addr;
 	struct addrinfo ashints, fshints, *asres, *fsres;
 	int n;
+	int RID;
 	int asfd, fsfd;
 	char UID[5], pass[8];
 
 	// input vars
 	char line[256];
 	char command[128];
-	char message[260];
+	char message[512];
 	char arg1[128], arg2[128];
 	int c;
 
@@ -161,15 +162,40 @@ int main(int argc, char *argv[]) {
 		}
 		else if(strcmp(command, "req") == 0) {
 
+			RID = rand() % 10000;
+
+			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
+				sprintf(message, "REG %s %04d %s %s\n", UID, RID, arg1, arg2);
+				writeMessage(asfd, message);	
+			}
+			else{
+				sprintf(message, "REG %s %04d %s\n", UID, RID, arg1);
+				writeMessage(asfd, message);
+			}
+
+			readMessage(asfd, message);
+			puts(message);
+
 		}
 		else if(strcmp(command, "val") == 0) {
-			
+
+			sprintf(message, "AUT %s %d %s\n", UID, RID, arg1);
+			writeMessage(asfd, message);
+
+			readMessage(asfd, message);
+			sscanf(message, "%s %s\n", arg1, arg2);
+
+			if(strcmp(arg2, "0") != 0){
+				printf("Authenticated! (TID=%s)\n", arg2);
+			}else{
+				puts("Authentication Failed!");
+			}
 		}
 		else if(strcmp(command, "list") == 0) {
-			
+			/*fs*/
 		}
 		else if(strcmp(command, "retrieve") == 0) {
-			
+			/*fs*/
 		}
 		else if(strcmp(command, "upload") == 0) {
 			
@@ -181,7 +207,7 @@ int main(int argc, char *argv[]) {
 			
 		}
 		else if(strcmp(command, "exit") == 0) {
-			
+			close(asfd);
 		}
 		else {
 			// idk
