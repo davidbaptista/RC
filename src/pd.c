@@ -145,6 +145,9 @@ int main(int argc, char *argv[]) {
                 write(1, "echo: ", 6); 
                 write(1, buffer, n);
             }
+			else {
+				puts("Command unknown");
+			}
         }
         if(FD_ISSET(serverfd, &fds)){
 
