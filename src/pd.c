@@ -50,7 +50,7 @@ static void parseArgs (long argc, char* const argv[]) {
 int main(int argc, char *argv[]) {
     int c;
     int counter;
-    int serverfd, inputfd = 0;
+    int asfd, pdfd;
     char msg[128];
     char line[128];
     char buffer[128];
@@ -65,10 +65,15 @@ int main(int argc, char *argv[]) {
 
     parseArgs(argc, argv);
 
-    serverfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
-    if(serverfd == -1) {
+    asfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
+    if(asfd == -1) {
         exit(1);
     }
+
+	pdfd = socket(AF_INET, SOCK_DGRAM, 0);
+	if(pdfd == -1) {
+		exit(1);
+	}
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family=AF_INET; // IPv4
@@ -79,35 +84,35 @@ int main(int argc, char *argv[]) {
         exit(1);
     }	
 
+    FD_ZERO(&fds);
+    FD_SET(pdfd, &fds);
+    FD_SET(0, &fds);
+
 	bool reg = false; // checks whether or not there already is a registered user
 
-    FD_ZERO(&fds);
-    FD_SET(serverfd, &fds);
-    FD_SET(inputfd, &fds);
-
     while (true){
-        counter = select(serverfd, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
+        counter = select(pdfd, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
 
         if (counter <= 0) {
             exit(1);
         }
 
-        if(FD_ISSET(inputfd, &fds)){
+        if(FD_ISSET(0, &fds)){
             fgets(line, sizeof(line), stdin);
 
             c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
-            if(strcmp(command, "exit") == 0) {
+            if(c == 1 && strcmp(command, "exit") == 0) {
                 if(reg) {
                     sprintf(msg, "UNR %s %s\n", arg1, arg2);
 
-                    n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+                    n = sendto(asfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
                     if(n == -1) {
                         exit(1);
                     }
 
                     addrlen = sizeof(addr);
-                    n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+                    n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
                     buffer[n] = '\0';
 
                     if(n == -1) {
@@ -118,20 +123,23 @@ int main(int argc, char *argv[]) {
                         reg = false;
                     }
 
-                    write(1, "echo: ", 6); 
-                    write(1, buffer, n);
+                    write(1, "echo: ", 6);	// temporary
+                    write(1, buffer, n);	// temporary
                 }
+				else {
+					puts("User is unregistered");	// temporary
+				}
             }
-            else if (strcmp(command, "reg") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
+            else if (c == 3 && strcmp(command, "reg") == 0 && strlen(arg1) == 5 && strlen(arg2) == 8) {
                 sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, pdIP, pdPort);
 
-                n = sendto(serverfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+                n = sendto(asfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
                 if(n == -1) {
                     exit(1);
                 }
 
                 addrlen = sizeof(addr);
-                n = recvfrom(serverfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+                n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
                 buffer[n] = '\0';
 
                 if(n == -1) {
@@ -142,17 +150,20 @@ int main(int argc, char *argv[]) {
                     reg = true;
                 }
 
-                write(1, "echo: ", 6); 
-                write(1, buffer, n);
+                write(1, "echo: ", 6); 	// temporary
+                write(1, buffer, n);	// temporary
             }
+			else {
+				puts("Command unknown"); 	// temporary	
+			}
         }
-        if(FD_ISSET(serverfd, &fds)){
+        if(FD_ISSET(pdfd, &fds)){
 
         }
     }
 
     freeaddrinfo(res);
-    close(serverfd);
+    close(asfd);
     exit(0);
 
 }
