@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
 	int n;
 	int RID;
 	int asfd, fsfd;
-	char UID[5], pass[8];
+	char UID[6], pass[9];
 
 	// input vars
 	char line[256];
@@ -158,7 +158,7 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(message, "RLO OK\n")==0) {
 				strcpy(UID, arg1);
-				strcpy(UID, arg2);
+				strcpy(pass, arg2);
 				puts("You are now logged in");
 			}
 			else {
@@ -166,15 +166,14 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		else if(strcmp(command, "req") == 0) {
-
 			RID = rand() % 10000;
 
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
-				sprintf(message, "REG %s %04d %s %s\n", UID, RID, arg1, arg2);
+				sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
 				writeMessage(asfd, message);	
 			}
 			else{
-				sprintf(message, "REG %s %04d %s\n", UID, RID, arg1);
+				sprintf(message, "REQ %s %04d %s\n", UID, RID, arg1);
 				writeMessage(asfd, message);
 			}
 

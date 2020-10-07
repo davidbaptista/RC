@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     char command[128];
     char arg1[16], arg2[16];
     struct sockaddr_in addr;
-    struct addrinfo hints, *res;
+    struct addrinfo ashints, *asres, pdhints, *pdres;
     ssize_t n;
 	fd_set fds;	
     socklen_t addrlen;
@@ -75,14 +75,27 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family=AF_INET; // IPv4
-    hints.ai_socktype=SOCK_DGRAM; // UDP
-	hints.ai_flags=AI_CANONNAME;
+    memset(&ashints, 0, sizeof(ashints));
+    ashints.ai_family=AF_INET; // IPv4
+    ashints.ai_socktype=SOCK_DGRAM; // UDP
+	ashints.ai_flags=AI_CANONNAME;
 
-    if(getaddrinfo(asIP, asPort, &hints, &res) != 0) {
+	memset(&pdhints, 0, sizeof(pdhints));
+    pdhints.ai_family=AF_INET; // IPv4
+    pdhints.ai_socktype=SOCK_DGRAM; // UDP
+	pdhints.ai_flags=AI_CANONNAME;
+
+    if(getaddrinfo(asIP, asPort, &ashints, &asres) != 0) {
         exit(1);
-    }	
+	}
+
+	if(getaddrinfo(pdIP, pdPort, &pdhints, &pdres) != 0) {
+		exit(1);
+	}
+
+	if(bind(pdfd, pdres->ai_addr, pdres->ai_addrlen) == -1) {
+		exit(1);
+	}
 
     FD_ZERO(&fds);
     FD_SET(pdfd, &fds);
@@ -106,7 +119,7 @@ int main(int argc, char *argv[]) {
                 if(reg) {
                     sprintf(msg, "UNR %s %s\n", arg1, arg2);
 
-                    n = sendto(asfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+                    n = sendto(asfd, msg, strlen(msg), 0, asres->ai_addr, asres->ai_addrlen);
                     if(n == -1) {
                         exit(1);
                     }
@@ -133,7 +146,7 @@ int main(int argc, char *argv[]) {
             else if (c == 3 && strcmp(command, "reg") == 0 && strlen(arg1) == 5 && strlen(arg2) == 8) {
                 sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, pdIP, pdPort);
 
-                n = sendto(asfd, msg, strlen(msg), 0, res->ai_addr, res->ai_addrlen);
+                n = sendto(asfd, msg, strlen(msg), 0, asres->ai_addr, asres->ai_addrlen);
                 if(n == -1) {
                     exit(1);
                 }
@@ -158,11 +171,11 @@ int main(int argc, char *argv[]) {
 			}
         }
         if(FD_ISSET(pdfd, &fds)){
-
+			puts("lets get it");
         }
     }
 
-    freeaddrinfo(res);
+    freeaddrinfo(asres);
     close(asfd);
     exit(0);
 
