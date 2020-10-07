@@ -15,6 +15,8 @@
 
 #define DEFAULT_IP "127.0.0.1"
 
+#define MESSAGE_SIZE 512
+
 
 #define bool int
 #define true 1
@@ -55,14 +57,12 @@ void parseArgs(long argc, char* const argv[]) {
 void writeMessage(int fd, char *msg) {
 	ssize_t nbytes, nleft, nwritten;
 	char *ptr;
-
 	ptr = msg;
-	nleft = sizeof(msg);
-
-	printf("%ld",nleft);
+	nleft = strlen(msg);
 
 	while(nleft > 0) {
 		nwritten = write(fd, ptr, nleft);
+
 		if(nwritten <= 0) {
 			exit(1);
 		}
@@ -74,19 +74,23 @@ void writeMessage(int fd, char *msg) {
 void readMessage(int fd, char *msg) {
 	ssize_t nbytes, nleft, nread;
 	char *ptr;
-
 	ptr = msg;
-	nleft = sizeof(msg);
+	nleft = MESSAGE_SIZE;
 
 	while(nleft > 0) {
 		nread = read(fd, ptr, nleft);
+
 		if(nread == -1) {
 			exit(1);
 		}
 		else if(nread == 0) {
 			break;
 		}
+
 		nleft -= nread;
+		if(ptr[nread-1] == '\n'){
+			break;
+		}
 		ptr += nread;
 	}
 
@@ -140,8 +144,6 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	puts("passei");
-
 	while(true) {
 		fgets(line, sizeof(line), stdin);
 
@@ -149,12 +151,10 @@ int main(int argc, char *argv[]) {
 
 
 		if(strcmp(command, "login") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
-			sprintf(message, "LOG %s %s", arg1, arg2);
+			sprintf(message, "LOG %s %s\n", arg1, arg2);
 
 			writeMessage(asfd, message);
 			readMessage(asfd, message);
-
-			puts("cheguei");
 
 			if(strcmp(message, "RLO OK\n")==0) {
 				strcpy(UID, arg1);
