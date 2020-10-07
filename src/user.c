@@ -59,6 +59,8 @@ void writeMessage(int fd, char *msg) {
 	ptr = msg;
 	nleft = sizeof(msg);
 
+	printf("%ld",nleft);
+
 	while(nleft > 0) {
 		nwritten = write(fd, ptr, nleft);
 		if(nwritten <= 0) {
@@ -124,7 +126,6 @@ int main(int argc, char *argv[]) {
     fshints.ai_socktype=SOCK_STREAM; // TDP
 	fshints.ai_flags=AI_CANONNAME;
 
-	puts(asPort);
 
 	if(getaddrinfo(asIP, asPort, &ashints, &asres) != 0) {
         exit(1);
@@ -139,10 +140,13 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	puts("passei");
+
 	while(true) {
 		fgets(line, sizeof(line), stdin);
 
 		c = sscanf(line, "%s %s %s", command, arg1, arg2);
+
 
 		if(strcmp(command, "login") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
 			sprintf(message, "LOG %s %s", arg1, arg2);
@@ -150,8 +154,9 @@ int main(int argc, char *argv[]) {
 			writeMessage(asfd, message);
 			readMessage(asfd, message);
 
+			puts("cheguei");
 
-			if(strcmp(message, "RLO OK\n")) {
+			if(strcmp(message, "RLO OK\n")==0) {
 				strcpy(UID, arg1);
 				strcpy(UID, arg2);
 				puts("You are now logged in");
