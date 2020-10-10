@@ -78,12 +78,12 @@ int main(int argc, char *argv[]) {
     memset(&ashints, 0, sizeof(ashints));
     ashints.ai_family=AF_INET; // IPv4
     ashints.ai_socktype=SOCK_DGRAM; // UDP
-	ashints.ai_flags=AI_CANONNAME;
+	ashints.ai_flags=AI_PASSIVE;
 
 	memset(&pdhints, 0, sizeof(pdhints));
     pdhints.ai_family=AF_INET; // IPv4
     pdhints.ai_socktype=SOCK_DGRAM; // UDP
-	pdhints.ai_flags=AI_CANONNAME;
+	pdhints.ai_flags=AI_PASSIVE;
 
     if(getaddrinfo(asIP, asPort, &ashints, &asres) != 0) {
         exit(1);
@@ -96,6 +96,9 @@ int main(int argc, char *argv[]) {
 	if(bind(pdfd, pdres->ai_addr, pdres->ai_addrlen) == -1) {
 		exit(1);
 	}
+
+	puts(pdPort);
+	puts(pdIP);
 
     FD_ZERO(&fds);
     FD_SET(pdfd, &fds);
