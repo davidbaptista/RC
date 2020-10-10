@@ -97,16 +97,12 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	puts(pdPort);
-	puts(pdIP);
-
-    FD_ZERO(&fds);
-    FD_SET(pdfd, &fds);
-    FD_SET(0, &fds);
-
 	bool reg = false; // checks whether or not there already is a registered user
 
     while (true){
+		FD_ZERO(&fds);
+    	FD_SET(pdfd, &fds);
+    	FD_SET(0, &fds);
         counter = select(pdfd + 1, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
 
         if (counter <= 0) {
