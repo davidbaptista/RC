@@ -56,11 +56,11 @@ int main(int argc, char *argv[]) {
     char buffer[128];
     char command[128];
     char arg1[16], arg2[16];
-    struct sockaddr_in addr;
+    struct sockaddr_in asaddr, pdaddr;
     struct addrinfo ashints, *asres, pdhints, *pdres;
     ssize_t n;
 	fd_set fds;	
-    socklen_t addrlen;
+    socklen_t asaddrlen, pdaddrlen;
 
 
     parseArgs(argc, argv);
@@ -107,12 +107,17 @@ int main(int argc, char *argv[]) {
 	bool reg = false; // checks whether or not there already is a registered user
 
     while (true){
-        counter = select(pdfd, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
+        counter = select(pdfd + 1, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
 
         if (counter <= 0) {
             exit(1);
         }
-
+		
+        if(FD_ISSET(pdfd, &fds)){
+			pdaddrlen = sizeof(pdaddr);
+			n = recvfrom(pdfd, buffer, 128, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
+			puts("lets get it");
+        }
         if(FD_ISSET(0, &fds)){
             fgets(line, sizeof(line), stdin);
 
@@ -127,8 +132,8 @@ int main(int argc, char *argv[]) {
                         exit(1);
                     }
 
-                    addrlen = sizeof(addr);
-                    n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+                    asaddrlen = sizeof(asaddr);
+                    n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&asaddr, &asaddrlen);
                     buffer[n] = '\0';
 
                     if(n == -1) {
@@ -154,8 +159,8 @@ int main(int argc, char *argv[]) {
                     exit(1);
                 }
 
-                addrlen = sizeof(addr);
-                n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&addr, &addrlen);
+                asaddrlen = sizeof(asaddr);
+                n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&asaddr, &asaddrlen);
                 buffer[n] = '\0';
 
                 if(n == -1) {
@@ -172,9 +177,6 @@ int main(int argc, char *argv[]) {
 			else {
 				puts("Command unknown"); 	// temporary	
 			}
-        }
-        if(FD_ISSET(pdfd, &fds)){
-			puts("lets get it");
         }
     }
 
