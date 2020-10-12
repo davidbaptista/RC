@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
 				puts("You are now logged in");
 			}
 			else {
-				puts(message);
+				printf("echo: %s\n", message);
 			}
 		}
 		else if(strcmp(command, "req") == 0) {
@@ -178,8 +178,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			readMessage(asfd, message);
-			puts(message);
-
+			printf("echo: %s\n", message);
 		}
 		else if(strcmp(command, "val") == 0) {
 
@@ -187,7 +186,7 @@ int main(int argc, char *argv[]) {
 			writeMessage(asfd, message);
 
 			readMessage(asfd, message);
-			sscanf(message, "%s %s\n", arg1, arg2);
+			sscanf(message, "%s %s", arg1, arg2);
 
 			if(strcmp(arg2, "0") != 0){
 				printf("Authenticated! (TID=%s)\n", arg2);
