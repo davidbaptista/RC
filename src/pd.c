@@ -124,10 +124,7 @@ int main(int argc, char *argv[]) {
             }
 			else {
                 strcpy(msg,"RVC NOK\n");
-				exit(1);
             }
-
-            puts(msg);
             
             n = sendto(pdfd, msg, strlen(msg), 0, (struct sockaddr*)&pdaddr, pdaddrlen);
             if(n == -1) {
