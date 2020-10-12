@@ -56,6 +56,7 @@ int main(int argc, char *argv[]) {
     char buffer[128];
     char command[128];
     char arg1[16], arg2[16];
+    char UID[6], pass[9];
     struct sockaddr_in asaddr, pdaddr;
     struct addrinfo ashints, *asres, pdhints, *pdres;
     ssize_t n;
@@ -94,6 +95,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if(bind(pdfd, pdres->ai_addr, pdres->ai_addrlen) == -1) {
+        perror("bind()");
 		exit(1);
 	}
 
@@ -112,7 +114,24 @@ int main(int argc, char *argv[]) {
         if(FD_ISSET(pdfd, &fds)){
 			pdaddrlen = sizeof(pdaddr);
 			n = recvfrom(pdfd, buffer, 128, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
-			puts("lets get it");
+			buffer[n]= '\0';
+
+            c = sscanf(buffer, "%s %s %s", command, arg1, arg2);
+
+            if(strcmp(arg1,UID)==0){
+                strcpy(msg,"RVC OK\n");
+                printf("VLC=%s\n",arg2);
+            }else{
+                strcpy(msg,"RVC NOK\n");
+            }
+
+            //puts(msg);
+            
+            n = sendto(pdfd, msg, strlen(msg), 0, pdres->ai_addr, pdres->ai_addrlen);
+            if(n == -1) {
+                exit(1);
+            }
+
         }
         if(FD_ISSET(0, &fds)){
             fgets(line, sizeof(line), stdin);
@@ -165,6 +184,8 @@ int main(int argc, char *argv[]) {
 
                 if(!strcmp(buffer, "RRG OK\n")) {
                     reg = true;
+                    strcpy(UID,arg1);
+                    strcpy(pass,arg2);
                 }
 
                 write(1, "echo: ", 6); 	// temporary
