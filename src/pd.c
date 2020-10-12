@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
     while (true){
 		FD_ZERO(&fds);
     	FD_SET(pdfd, &fds);
-    	FD_SET(0, &fds);
+		FD_SET(0, &fds);
         counter = select(pdfd + 1, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
 
         if (counter <= 0) {
@@ -118,16 +118,18 @@ int main(int argc, char *argv[]) {
 
             c = sscanf(buffer, "%s %s %s", command, arg1, arg2);
 
-            if(strcmp(arg1,UID)==0){
-                strcpy(msg,"RVC OK\n");
-                printf("VLC=%s\n",arg2);
-            }else{
+            if(strcmp(arg1,UID) == 0) {
+                strcpy(msg, "RVC OK\n");
+                printf("VLC=%s\n", arg2);
+            }
+			else {
                 strcpy(msg,"RVC NOK\n");
+				exit(1);
             }
 
-            //puts(msg);
+            puts(msg);
             
-            n = sendto(pdfd, msg, strlen(msg), 0, pdres->ai_addr, pdres->ai_addrlen);
+            n = sendto(pdfd, msg, strlen(msg), 0, (struct sockaddr*)&pdaddr, pdaddrlen);
             if(n == -1) {
                 exit(1);
             }
