@@ -27,12 +27,12 @@ char *asPort = NULL;
 char *fsIP = NULL;
 char *fsPort = NULL;
 
-struct operation {
+struct operation{
 	char Fname[25];
 	char TID[5];
 	char Fop;
-	bool done = false;
-};
+	bool available;
+} operation_default= {.available=1};
 
 void parseArgs(long argc, char* const argv[]) {
 	char c;
@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
 				puts("You are now logged in");
 			}
 			else {
-				puts(message);
+				puts("Login failed!");
 			}
 		}
 		else if(strcmp(command, "req") == 0) {
@@ -184,20 +184,21 @@ int main(int argc, char *argv[]) {
 			}
 
 			readMessage(asfd, message);
-			if(strcmp(message, "RRQ OK") == 0) {
+			if(strcmp(message, "RRQ OK\n") == 0) {
 				for(int i = 0; i < MAX_OPERATIONS; i++) {
-					if(!operations[i].done) {
+					if(operations[i].available) {
 						operations[i].Fop = arg1[0];
 						if(operations[i].Fop == 'R' || operations[i].Fop == 'U' || operations[i].Fop == 'D') {
 							strcpy(operations[i].Fname, arg2);
 						}
+						operations[i].available = 0;
 						oi = i;
 						break;
 					}
 				}
 			}
 			else {
-				puts(message);
+				//erro
 			}
 
 		}
@@ -241,6 +242,7 @@ int main(int argc, char *argv[]) {
 			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
+
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
 			if(n == -1) {
 				exit(1);
@@ -252,12 +254,26 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			sscanf(message, "UPL %s %s %s %s %s\n", UID, operations[i].TID, operations[i].Fname, 6, "Hello!");
+			sprintf(message, "UPL %s %s %s %d %s\n", UID, operations[i].TID, operations[i].Fname, 6, "Hello!");
 
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
 
-			puts(message);
+			if(strcmp(message,"RUP OK\n") == 0){
+				printf("Success uploading %s\n",operations[i].Fname);
+				operations[i].available = 1;
+			}
+			else if(strcmp(message,"RUP DUP\n") == 0){
+				printf("File %s already exists\n",operations[i].Fname);
+			}
+			else(strcmp(message,"RUP FULL\n") == 0){
+				printf("File limit exceeded\n");
+			}
+			else{
+				puts("Upload failed");
+			}
+
+		
 		}
 		else if(strcmp(command, "delete") == 0) {
 			
