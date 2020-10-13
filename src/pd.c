@@ -197,7 +197,9 @@ int main(int argc, char *argv[]) {
     }
 
     freeaddrinfo(asres);
+	freeaddrinfo(pdres);
     close(asfd);
+	close(pdfd);
     exit(0);
 
 }

@@ -16,17 +16,23 @@
 #define DEFAULT_IP "127.0.0.1"
 
 #define MESSAGE_SIZE 512
-
+#define MAX_OPERATIONS 64
 
 #define bool int
 #define true 1
 #define false 0
 
-
 char *asIP = NULL;
 char *asPort = NULL;
 char *fsIP = NULL;
 char *fsPort = NULL;
+
+struct operation {
+	char Fname[25];
+	char TID[5];
+	char Fop;
+	bool done = false;
+};
 
 void parseArgs(long argc, char* const argv[]) {
 	char c;
@@ -36,7 +42,7 @@ void parseArgs(long argc, char* const argv[]) {
     fsIP = DEFAULT_IP;
     fsPort = DEFAULT_FS_PORT;
 
-    while ((c = getopt(argc, argv, "n:p:m:q:")) != -1){
+    while ((c = getopt(argc, argv, "n:p:m:q:")) != -1) {
         switch (c) {
             case 'n':
                 asIP = optarg;
@@ -109,16 +115,16 @@ int main(int argc, char *argv[]) {
 	// input vars
 	char line[256];
 	char command[128];
-	char message[512];
+	char message[MESSAGE_SIZE];
 	char arg1[128], arg2[128];
 	int c;
 
+	int oi = -1; // -1 has a index between req and val. -1 otherwise
+	struct operation operations[MAX_OPERATIONS];
 
 	parseArgs(argc, argv);
 
 	asfd = socket(AF_INET, SOCK_STREAM, 0); // AS Socket TCP
-	fsfd = socket(AF_INET, SOCK_STREAM, 0); // FS Socket TCP
-
 
     memset(&ashints, 0, sizeof(ashints));
     ashints.ai_family=AF_INET; // IPv4
@@ -162,7 +168,7 @@ int main(int argc, char *argv[]) {
 				puts("You are now logged in");
 			}
 			else {
-				printf("echo: %s\n", message);
+				puts(message);
 			}
 		}
 		else if(strcmp(command, "req") == 0) {
@@ -170,18 +176,32 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
 				sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
-				writeMessage(asfd, message);	
+				writeMessage(asfd, message);
 			}
-			else{
+			else {
 				sprintf(message, "REQ %s %04d %s\n", UID, RID, arg1);
 				writeMessage(asfd, message);
 			}
 
 			readMessage(asfd, message);
-			printf("echo: %s\n", message);
+			if(strcmp(message, "RRQ OK") == 0) {
+				for(int i = 0; i < MAX_OPERATIONS; i++) {
+					if(!operations[i].done) {
+						operations[i].Fop = arg1[0];
+						if(operations[i].Fop == 'R' || operations[i].Fop == 'U' || operations[i].Fop == 'D') {
+							strcpy(operations[i].Fname, arg2);
+						}
+						oi = i;
+						break;
+					}
+				}
+			}
+			else {
+				puts(message);
+			}
+
 		}
 		else if(strcmp(command, "val") == 0) {
-
 			sprintf(message, "AUT %s %d %s\n", UID, RID, arg1);
 			writeMessage(asfd, message);
 
@@ -190,18 +210,54 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(arg2, "0") != 0){
 				printf("Authenticated! (TID=%s)\n", arg2);
-			}else{
+				if(oi != -1) {
+					strcpy(operations[oi].TID, arg2);
+					oi = -1;
+				}
+			}
+			else{
 				puts("Authentication Failed!");
 			}
 		}
 		else if(strcmp(command, "list") == 0) {
-			/*fs*/
+			fsfd = socket(AF_INET, SOCK_STREAM, 0);
+
+			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
+			if(n == -1) {
+				exit(1);
+			}
+
+			sprintf(message, "LST %s %s", UID, TID);
+
+			writeMessage(fsfd, message);
+			readMessage(fsfd, message);
+
+			close(fsfd);
 		}
 		else if(strcmp(command, "retrieve") == 0) {
 			/*fs*/
 		}
 		else if(strcmp(command, "upload") == 0) {
-			
+			int i = 0;
+			fsfd = socket(AF_INET, SOCK_STREAM, 0);
+
+			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
+			if(n == -1) {
+				exit(1);
+			}
+
+			for(i = 0; i < MAX_OPERATIONS; i++) {
+				if(strcmp(operations[i].Fname, arg1) == 0 && operations[i].Fop == 'U') {
+					break;
+				}
+			}
+
+			sscanf(message, "UPL %s %s %s %s %s\n", UID, operations[i].TID, operations[i].Fname, 6, "Hello!");
+
+			writeMessage(fsfd, message);
+			readMessage(fsfd, message);
+
+			puts(message);
 		}
 		else if(strcmp(command, "delete") == 0) {
 			
@@ -217,4 +273,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+    freeaddrinfo(asres);
+	freeaddrinfo(fsres);
+	close(asfd);
+	exit(0);
 }
