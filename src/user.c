@@ -15,6 +15,11 @@
 
 #define DEFAULT_IP "127.0.0.1"
 
+#define NOK_MESSAGE "Error: User ID does not exist"
+#define ERR_MESSAGE "Error: Operation failed"
+#define TID_MESSAGE "Wrong TID"
+#define EOF_MESSAGE "Error: File is not available"
+
 #define MESSAGE_SIZE 512
 #define MAX_OPERATIONS 64
 
@@ -245,32 +250,83 @@ int main(int argc, char *argv[]) {
 
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
-			i = 1;
-			int nfiles;
-			char *p;
-			p = strtok(message, " ");
-			p = strtok(NULL, " ");
-			nfiles = strtol(p, NULL, 10);
-			p = strtok(NULL, " ");
 
-			for(p; p != NULL; p = strtok(NULL, " ")) {
-				printf("%d - ", i);
-				printf("%s ", p);
+			if(strcmp(message, "RDL NOK\n") == 0){
+				puts(NOK_MESSAGE);
+			}else if(strcmp(message, "RDL EOF\n") == 0){
+				puts(EOF_MESSAGE);
+			}else if(strcmp(message, "RDL INV\n") == 0){
+				puts(TID_MESSAGE);
+			}else if(strcmp(message, "RDL ERR\n") == 0){
+				puts(ERR_MESSAGE);
+			}else{
+				i = 1;
+				int nfiles;
+				char *p;
+				p = strtok(message, " ");
 				p = strtok(NULL, " ");
-				if(i == nfiles) {
-					printf("%s", p);
+				nfiles = strtol(p, NULL, 10);
+				p = strtok(NULL, " ");
+
+				for(p; p != NULL; p = strtok(NULL, " ")) {
+					printf("%d - ", i);
+					printf("%s ", p);
+					p = strtok(NULL, " ");
+					if(i == nfiles) {
+						printf("%s", p);
+					}
+					else {
+						printf("%s \n", p);
+					}
+					i++;
 				}
-				else {
-					printf("%s \n", p);
-				}
-				i++;
 			}
 
 			close(fsfd);
 		}
 		else if(strcmp(command, "retrieve") == 0) {
-			/*fs*/
+			int i = 0;
+			fsfd = socket(AF_INET, SOCK_STREAM, 0);
+
+			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
+			if(n == -1) {
+				exit(1);
+			}
+
+			for(i = 0; i < MAX_OPERATIONS; i++) {
+				if(strcmp(operations[i].Fname, arg1) == 0 && operations[i].Fop == 'R') {
+					break;
+				}
+			}
+
+			sprintf(message, "RTV %s %s %s\n", UID, operations[i].TID, operations[i].Fname);
+			puts(message);
+			writeMessage(fsfd, message);
+			readMessage(fsfd, message);
+
+			char cmd[4];
+			char status[4];
+			char fsize[32];
+			char data[128];
+			sscanf(message, "%s %s %s %s", cmd, status, fsize, data);
+
+			if(strcmp(status, "OK") == 0){
+				printf("Filename: %s\n Data: %s\n", operations[i].Fname, data);
+				puts("File retrieve succeeded");
+			}else if(strcmp(status, "NOK")){
+				puts(NOK_MESSAGE);
+			}else if(strcmp(status, "INV")){
+				puts(TID_MESSAGE);
+			}else if(strcmp(status, "EOF")){
+				puts(EOF_MESSAGE);
+			}else{
+				puts(ERR_MESSAGE);
+			}
+
+			operations[i].available = 1;
+			close(fsfd);
 		}
+
 		else if(strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) {
 			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -311,8 +367,41 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 		
 		}
-		else if(strcmp(command, "delete") == 0) {
-			
+		else if(strcmp(command, "delete") == 0 || strcmp(command, "d") == 0) {
+			int i = 0;
+			fsfd = socket(AF_INET, SOCK_STREAM, 0);
+
+			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
+			if(n == -1) {
+				exit(1);
+			}
+
+			for(i = 0; i < MAX_OPERATIONS; i++) {
+				if(strcmp(operations[i].Fname, arg1) == 0 && operations[i].Fop == 'D') {
+					break;
+				}
+			}
+
+			sprintf(message, "DEL %s %s %s\n", UID, operations[i].TID, operations[i].Fname);
+			puts(message);
+			writeMessage(fsfd, message);
+			readMessage(fsfd, message);
+
+			if(strcmp(message, "RDL OK\n") == 0){
+				puts("Operation succeeded");
+			}else if(strcmp(message, "RDL NOK\n") == 0){
+				puts(NOK_MESSAGE);
+			}else if(strcmp(message, "RDL EOF\n") == 0){
+				puts(EOF_MESSAGE);
+			}else if(strcmp(message, "RDL INV\n") == 0){
+				puts(TID_MESSAGE);
+			}else{
+				puts(ERR_MESSAGE);
+			}
+
+			operations[i].available = 1;
+			close(fsfd);
+
 		}
 		else if(strcmp(command, "remove") == 0) {
 			
