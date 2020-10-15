@@ -117,6 +117,8 @@ int main(int argc, char *argv[]) {
 	char command[128];
 	char message[MESSAGE_SIZE];
 	char arg1[128], arg2[128];
+	char Fname[25];
+	char Fop;
 	int c;
 
 	int oi = -1; // -1 has a index between req and val. -1 otherwise
@@ -184,64 +186,94 @@ int main(int argc, char *argv[]) {
 			}
 
 			readMessage(asfd, message);
+
 			if(strcmp(message, "RRQ OK\n") == 0) {
-				for(int i = 0; i < MAX_OPERATIONS; i++) {
-					if(operations[i].available) {
-						operations[i].Fop = arg1[0];
-						if(operations[i].Fop == 'R' || operations[i].Fop == 'U' || operations[i].Fop == 'D') {
-							strcpy(operations[i].Fname, arg2);
-						}
-						operations[i].available = 0;
-						oi = i;
-						break;
-					}
+				Fop = arg1[0];
+				if(Fop == 'R' || Fop == 'U' || Fop == 'D') {
+					strcpy(Fname, arg2);
 				}
 			}
 			else {
-				//erro
+				puts(message);
 			}
-
 		}
 		else if(strcmp(command, "val") == 0) {
-			sprintf(message, "AUT %s %d %s\n", UID, RID, arg1);
+			sprintf(message, "AUT %s %04d %s\n", UID, RID, arg1);
 			writeMessage(asfd, message);
 
 			readMessage(asfd, message);
 			sscanf(message, "%s %s", arg1, arg2);
 
+
 			if(strcmp(arg2, "0") != 0){
-				printf("Authenticated! (TID=%s)\n", arg2);
-				if(oi != -1) {
-					strcpy(operations[oi].TID, arg2);
-					oi = -1;
-				}
+				for(int i = 0; i < MAX_OPERATIONS; i++) {
+					if(operations[i].available) {
+						operations[i].available = false;
+						operations[i].Fop = Fop;
+						strcpy(operations[i].TID, arg2);
+						if(Fop == 'R' || Fop == 'U' || Fop == 'D') {
+							strcpy(operations[i].Fname, Fname);
+						}
+						break;
+					}
+				} 
+
+				printf("Authenticated! (TID=%s)\n", arg2);		
 			}
 			else{
 				puts("Authentication Failed!");
 			}
 		}
-		else if(strcmp(command, "list") == 0) {
+		else if(strcmp(command, "list") == 0 || strcmp(command, "l") == 0) {
+			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
+
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
 			if(n == -1) {
 				exit(1);
 			}
 
-			sprintf(message, "LST %s %s", UID, TID);
+			for(i = 0; i < MAX_OPERATIONS; i++) {
+				if(operations[i].Fop == 'L') {
+					break;
+				}
+			}
+
+			sprintf(message, "LST %s %s\n", UID, operations[i].TID);
+			operations[i].available = true;
 
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
+			i = 1;
+			int nfiles;
+			char *p;
+			p = strtok(message, " ");
+			p = strtok(NULL, " ");
+			nfiles = strtol(p, NULL, 10);
+			p = strtok(NULL, " ");
+
+			for(p; p != NULL; p = strtok(NULL, " ")) {
+				printf("%d - ", i);
+				printf("%s ", p);
+				p = strtok(NULL, " ");
+				if(i == nfiles) {
+					printf("%s", p);
+				}
+				else {
+					printf("%s \n", p);
+				}
+				i++;
+			}
 
 			close(fsfd);
 		}
 		else if(strcmp(command, "retrieve") == 0) {
 			/*fs*/
 		}
-		else if(strcmp(command, "upload") == 0) {
+		else if(strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) {
 			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
-
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
 			if(n == -1) {
@@ -255,24 +287,28 @@ int main(int argc, char *argv[]) {
 			}
 
 			sprintf(message, "UPL %s %s %s %d %s\n", UID, operations[i].TID, operations[i].Fname, 6, "Hello!");
-
+			puts(message);
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
 
-			if(strcmp(message,"RUP OK\n") == 0){
+
+			if(strcmp(message,"RUP OK\n") == 0) {
 				printf("Success uploading %s\n",operations[i].Fname);
-				operations[i].available = 1;
 			}
-			else if(strcmp(message,"RUP DUP\n") == 0){
+			else if(strcmp(message,"RUP DUP\n") == 0) {
 				printf("File %s already exists\n",operations[i].Fname);
 			}
-			else(strcmp(message,"RUP FULL\n") == 0){
+			else if(strcmp(message,"RUP FULL\n") == 0) {
 				printf("File limit exceeded\n");
 			}
-			else{
+			else {
+				puts(message);
 				puts("Upload failed");
 			}
 
+			operations[i].available = 1;
+
+			close(fsfd);
 		
 		}
 		else if(strcmp(command, "delete") == 0) {
