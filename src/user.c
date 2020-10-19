@@ -17,11 +17,11 @@
 
 #define NOK_MESSAGE "Error: User ID does not exist"
 #define ERR_MESSAGE "Error: Operation failed"
-#define TID_MESSAGE "Wrong TID"
+#define TID_MESSAGE "Error: Wrong TID"
 #define EOF_MESSAGE "Error: File is not available"
+#define PROTOCOL_ERROR_MESSAGE "Error: Command not supported"
 
 #define MESSAGE_SIZE 512
-#define MAX_OPERATIONS 64
 
 #define bool int
 #define true 1
@@ -32,12 +32,6 @@ char *asPort = NULL;
 char *fsIP = NULL;
 char *fsPort = NULL;
 
-struct operation{
-	char Fname[25];
-	char TID[5];
-	char Fop;
-	bool available;
-} operation_default= {.available=1};
 
 void parseArgs(long argc, char* const argv[]) {
 	char c;
@@ -122,12 +116,11 @@ int main(int argc, char *argv[]) {
 	char command[128];
 	char message[MESSAGE_SIZE];
 	char arg1[128], arg2[128];
-	char Fname[25];
-	char Fop;
 	int c;
 
-	int oi = -1; // -1 has a index between req and val. -1 otherwise
-	struct operation operations[MAX_OPERATIONS];
+	char Fname[25];
+	char TID[5];
+	char Fop;
 
 	parseArgs(argc, argv);
 
@@ -199,7 +192,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else {
-				puts(message);
+				puts(ERR_MESSAGE);
 			}
 		}
 		else if(strcmp(command, "val") == 0) {
@@ -209,21 +202,9 @@ int main(int argc, char *argv[]) {
 			readMessage(asfd, message);
 			sscanf(message, "%s %s", arg1, arg2);
 
-
 			if(strcmp(arg2, "0") != 0){
-				for(int i = 0; i < MAX_OPERATIONS; i++) {
-					if(operations[i].available) {
-						operations[i].available = false;
-						operations[i].Fop = Fop;
-						strcpy(operations[i].TID, arg2);
-						if(Fop == 'R' || Fop == 'U' || Fop == 'D') {
-							strcpy(operations[i].Fname, Fname);
-						}
-						break;
-					}
-				} 
-
-				printf("Authenticated! (TID=%s)\n", arg2);		
+				strcpy(TID, arg2);
+				printf("Authenticated! (TID=%s)\n", TID);		
 			}
 			else{
 				puts("Authentication Failed!");
@@ -239,15 +220,8 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			for(i = 0; i < MAX_OPERATIONS; i++) {
-				if(operations[i].Fop == 'L') {
-					break;
-				}
-			}
-
-			sprintf(message, "LST %s %s\n", UID, operations[i].TID);
-			operations[i].available = true;
-
+			sprintf(message, "LST %s %s\n", UID, TID);
+	
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
 
@@ -293,14 +267,7 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			for(i = 0; i < MAX_OPERATIONS; i++) {
-				if(strcmp(operations[i].Fname, arg1) == 0 && operations[i].Fop == 'R') {
-					break;
-				}
-			}
-
-			sprintf(message, "RTV %s %s %s\n", UID, operations[i].TID, operations[i].Fname);
-			puts(message);
+			sprintf(message, "RTV %s %s %s\n", UID, TID, Fname);
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
 
@@ -311,7 +278,7 @@ int main(int argc, char *argv[]) {
 			sscanf(message, "%s %s %s %s", cmd, status, fsize, data);
 
 			if(strcmp(status, "OK") == 0){
-				printf("Filename: %s\n Data: %s\n", operations[i].Fname, data);
+				printf("Filename: %s\nData: %s\n", Fname, data);
 				puts("File retrieve succeeded");
 			}else if(strcmp(status, "NOK")){
 				puts(NOK_MESSAGE);
@@ -323,7 +290,6 @@ int main(int argc, char *argv[]) {
 				puts(ERR_MESSAGE);
 			}
 
-			operations[i].available = 1;
 			close(fsfd);
 		}
 
@@ -336,33 +302,28 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			for(i = 0; i < MAX_OPERATIONS; i++) {
-				if(strcmp(operations[i].Fname, arg1) == 0 && operations[i].Fop == 'U') {
-					break;
-				}
-			}
 
-			sprintf(message, "UPL %s %s %s %d %s\n", UID, operations[i].TID, operations[i].Fname, 6, "Hello!");
-			puts(message);
+			sprintf(message, "UPL %s %s %s %d %s\n", UID, TID, Fname, 6, "Hello!");
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
 
 
 			if(strcmp(message,"RUP OK\n") == 0) {
-				printf("Success uploading %s\n",operations[i].Fname);
+				printf("Success uploading %s\n",Fname);
 			}
 			else if(strcmp(message,"RUP DUP\n") == 0) {
-				printf("File %s already exists\n",operations[i].Fname);
+				printf("File %s already exists\n",Fname);
 			}
 			else if(strcmp(message,"RUP FULL\n") == 0) {
 				printf("File limit exceeded\n");
 			}
+			else if(strcmp(message,"RUP INV\n") == 0) {
+				puts(TID_MESSAGE);
+			}
 			else {
-				puts(message);
 				puts("Upload failed");
 			}
 
-			operations[i].available = 1;
 
 			close(fsfd);
 		
@@ -376,14 +337,7 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			for(i = 0; i < MAX_OPERATIONS; i++) {
-				if(strcmp(operations[i].Fname, arg1) == 0 && operations[i].Fop == 'D') {
-					break;
-				}
-			}
-
-			sprintf(message, "DEL %s %s %s\n", UID, operations[i].TID, operations[i].Fname);
-			puts(message);
+			sprintf(message, "DEL %s %s %s\n", UID, TID, Fname);
 			writeMessage(fsfd, message);
 			readMessage(fsfd, message);
 
@@ -399,23 +353,51 @@ int main(int argc, char *argv[]) {
 				puts(ERR_MESSAGE);
 			}
 
-			operations[i].available = 1;
 			close(fsfd);
 
 		}
-		else if(strcmp(command, "remove") == 0) {
+		else if(strcmp(command, "remove") == 0 || strcmp(command,"x") == 0) {
+			int i = 0;
+			fsfd = socket(AF_INET, SOCK_STREAM, 0);
+
+			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
+			if(n == -1) {
+				exit(1);
+			}
+
+			sprintf(message, "REM %s %s\n", UID, TID);
+			
+			writeMessage(fsfd, message);
+			readMessage(fsfd, message);
+
+			if(strcmp(message, "RRM OK\n") == 0){
+				puts("Operation succeeded");
+				break;
+			}else if(strcmp(message, "RRM NOK\n") == 0){
+				puts(NOK_MESSAGE);
+			}else if(strcmp(message, "RRM INV\n") == 0){
+				puts(TID_MESSAGE);
+			}else{
+				puts(ERR_MESSAGE);
+			}
+
 			
 		}
 		else if(strcmp(command, "exit") == 0) {
+	
+			freeaddrinfo(asres);
 			close(asfd);
+			exit(0);
+
 		}
 		else {
-			// idk
+			puts(PROTOCOL_ERROR_MESSAGE);
 		}
 	}
 
     freeaddrinfo(asres);
 	freeaddrinfo(fsres);
 	close(asfd);
+	close(fsfd);
 	exit(0);
 }
