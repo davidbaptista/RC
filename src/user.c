@@ -279,7 +279,6 @@ int main(int argc, char *argv[]) {
 			sscanf(message, "%s %s %s %s", cmd, status, fsize, data);
 
 			if(strcmp(status, "OK") == 0){
-				printf("Filename: %s\nData: %s\n", Fname, data);
 				puts("File retrieve succeeded");
 			}else if(strcmp(status, "NOK")){
 				puts(NOK_MESSAGE);
