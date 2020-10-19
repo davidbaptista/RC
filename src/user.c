@@ -60,7 +60,7 @@ void parseArgs(long argc, char* const argv[]) {
 }
 
 void writeMessage(int fd, char *msg) {
-	ssize_t nbytes, nleft, nwritten;
+	ssize_t nleft, nwritten;
 	char *ptr;
 	ptr = msg;
 	nleft = strlen(msg);
@@ -77,7 +77,7 @@ void writeMessage(int fd, char *msg) {
 } 
 
 void readMessage(int fd, char *msg) {
-	ssize_t nbytes, nleft, nread;
+	ssize_t nleft, nread;
 	char *ptr;
 	ptr = msg;
 	nleft = MESSAGE_SIZE;
@@ -177,6 +177,7 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
 				sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
+				puts("morre a escrever?");
 				writeMessage(asfd, message);
 			}
 			else {
@@ -184,7 +185,9 @@ int main(int argc, char *argv[]) {
 				writeMessage(asfd, message);
 			}
 
+
 			readMessage(asfd, message);
+
 
 			if(strcmp(message, "RRQ OK\n") == 0) {
 				Fop = arg1[0];
@@ -228,13 +231,17 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(message, "RDL NOK\n") == 0){
 				puts(NOK_MESSAGE);
-			}else if(strcmp(message, "RDL EOF\n") == 0){
+			}
+			else if(strcmp(message, "RDL EOF\n") == 0){
 				puts(EOF_MESSAGE);
-			}else if(strcmp(message, "RDL INV\n") == 0){
+			}
+			else if(strcmp(message, "RDL INV\n") == 0){
 				puts(TID_MESSAGE);
-			}else if(strcmp(message, "RDL ERR\n") == 0){
+			}
+			else if(strcmp(message, "RDL ERR\n") == 0){
 				puts(ERR_MESSAGE);
-			}else{
+			}
+			else {
 				i = 1;
 				int nfiles;
 				char *p;
@@ -270,23 +277,49 @@ int main(int argc, char *argv[]) {
 
 			sprintf(message, "RTV %s %s %s\n", UID, TID, Fname);
 			writeMessage(fsfd, message);
-			readMessage(fsfd, message);
 
-			char cmd[4];
+
+			ssize_t nleft = 7, nread, ntotal = 0;
+			char *ptr = message;
+
+			while(nleft > 0) {
+				nread = read(fsfd, ptr, nleft);
+
+				if(nread == -1) {
+					exit(1);
+				}
+				else if(nread == 0) {
+					break;
+				}
+				ntotal += nread;
+				nleft -= nread;
+				ptr += nread;
+			}
+
+			message[ntotal] = '\0';
+			printf("total: %ld\n", ntotal);
+
 			char status[4];
-			char fsize[32];
-			char data[128];
-			sscanf(message, "%s %s %s %s", cmd, status, fsize, data);
+			sscanf(message, "%s %s", command, status);
+			puts(status);
+			puts(message);
 
 			if(strcmp(status, "OK") == 0){
+				char fsize[32];
+
+
 				puts("File retrieve succeeded");
-			}else if(strcmp(status, "NOK")){
+			}
+			else if(strcmp(status, "NOK") == 0){
 				puts(NOK_MESSAGE);
-			}else if(strcmp(status, "INV")){
+			}
+			else if(strcmp(status, "INV") == 0){
 				puts(TID_MESSAGE);
-			}else if(strcmp(status, "EOF")){
+			}
+			else if(strcmp(status, "EOF") == 0){
 				puts(EOF_MESSAGE);
-			}else{
+			}
+			else{
 				puts(ERR_MESSAGE);
 			}
 
@@ -302,31 +335,46 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
+			sprintf(message, "UPL %s %s %s ", UID, TID, Fname);
 
-			sprintf(message, "UPL %s %s %s %d %s\n", UID, TID, Fname, 6, "Hello!");
-			writeMessage(fsfd, message);
-			readMessage(fsfd, message);
+			FILE *fp = fopen(Fname, "r");
 
-
-			if(strcmp(message,"RUP OK\n") == 0) {
-				printf("Success uploading %s\n",Fname);
-			}
-			else if(strcmp(message,"RUP DUP\n") == 0) {
-				printf("File %s already exists\n",Fname);
-			}
-			else if(strcmp(message,"RUP FULL\n") == 0) {
-				printf("File limit exceeded\n");
-			}
-			else if(strcmp(message,"RUP INV\n") == 0) {
-				puts(TID_MESSAGE);
+			if(fp == NULL) {
+				puts("File not available");
 			}
 			else {
-				puts("Upload failed");
+				writeMessage(fsfd, message);
+				fseek(fp, 0, SEEK_END);
+				long size = ftell(fp);
+				fseek(fp, 0, SEEK_SET);
+				sprintf(message, "%ld ", size);
+				writeMessage(fsfd, message);
+
+				while(fgets(message, 512, fp) != NULL) {
+					writeMessage(fsfd, message);
+				}
+
+				fclose(fp);
+
+				readMessage(fsfd, message);
+
+				if(strcmp(message,"RUP OK\n") == 0) {
+					printf("Success uploading %s\n",Fname);
+				}
+				else if(strcmp(message,"RUP DUP\n") == 0) {
+					printf("File %s already exists\n",Fname);
+				}
+				else if(strcmp(message,"RUP FULL\n") == 0) {
+					printf("File limit exceeded\n");
+				}
+				else if(strcmp(message,"RUP INV\n") == 0) {
+					puts(TID_MESSAGE);
+				}
+				else {
+					puts("Upload failed");
+				}
 			}
-
-
 			close(fsfd);
-		
 		}
 		else if(strcmp(command, "delete") == 0 || strcmp(command, "d") == 0) {
 			int i = 0;
