@@ -76,8 +76,8 @@ void writeMessage(int fd, char *msg) {
 	}
 } 
 
-void readMessage(int fd, char *msg) {
-	ssize_t nleft, nread;
+long readMessage(int fd, char *msg) {
+	ssize_t nleft, nread, ntotal = 0;
 	char *ptr;
 	ptr = msg;
 	nleft = MESSAGE_SIZE;
@@ -93,6 +93,7 @@ void readMessage(int fd, char *msg) {
 		}
 
 		nleft -= nread;
+		ntotal += nread;
 		if(ptr[nread-1] == '\n'){
 			break;
 		}
@@ -100,6 +101,8 @@ void readMessage(int fd, char *msg) {
 	}
 
 	ptr[nread] = '\0';
+
+	return ntotal;
 }
 
 int main(int argc, char *argv[]) {
@@ -175,24 +178,26 @@ int main(int argc, char *argv[]) {
 		else if(strcmp(command, "req") == 0) {
 			RID = rand() % 10000;
 
-			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
-				sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
-				puts("morre a escrever?");
-				writeMessage(asfd, message);
-			}
-			else {
-				sprintf(message, "REQ %s %04d %s\n", UID, RID, arg1);
-				writeMessage(asfd, message);
-			}
+			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "L") == 0 || strcmp(arg1, "D") == 0 || strcmp(arg1, "X") == 0) {
+				if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
+					sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
+					writeMessage(asfd, message);
+				}
+				else {
+					sprintf(message, "REQ %s %04d %s\n", UID, RID, arg1);
+					writeMessage(asfd, message);
+				}
 
+				readMessage(asfd, message);
 
-			readMessage(asfd, message);
-
-
-			if(strcmp(message, "RRQ OK\n") == 0) {
-				Fop = arg1[0];
-				if(Fop == 'R' || Fop == 'U' || Fop == 'D') {
-					strcpy(Fname, arg2);
+				if(strcmp(message, "RRQ OK\n") == 0) {
+					Fop = arg1[0];
+					if(Fop == 'R' || Fop == 'U' || Fop == 'D') {
+						strcpy(Fname, arg2);
+					}
+				}
+				else {
+					puts(ERR_MESSAGE);
 				}
 			}
 			else {
@@ -278,7 +283,6 @@ int main(int argc, char *argv[]) {
 			sprintf(message, "RTV %s %s %s\n", UID, TID, Fname);
 			writeMessage(fsfd, message);
 
-
 			ssize_t nleft = 7, nread, ntotal = 0;
 			char *ptr = message;
 
@@ -297,26 +301,63 @@ int main(int argc, char *argv[]) {
 			}
 
 			message[ntotal] = '\0';
-			printf("total: %ld\n", ntotal);
 
-			char status[4];
-			sscanf(message, "%s %s", command, status);
-			puts(status);
-			puts(message);
+			sscanf(message, "%s %s", command, message);
 
-			if(strcmp(status, "OK") == 0){
-				char fsize[32];
+			if(strcmp(message, "OK") == 0){
+				char fsize[11];
+				long size;
 
+				char *ptr = fsize;
+				ntotal = 0;
+				nleft = 11;
+
+				while(nleft > 0) {
+					nread = read(fsfd, ptr, nleft);
+
+					if(nread == -1) {
+						exit(1);
+					}
+					else if(nread == 0) {
+						break;
+					}
+					nleft -= nread;
+					ntotal += nread;
+					if(ptr[nread-1] == ' ') {
+						break;
+					}
+					ptr += nread;
+
+				}
+				fsize[ntotal] = '\0';
+
+				size = strtol(fsize, NULL, 10);
+				long nbytes = 0;
+
+				FILE *fp = fopen(Fname, "w");
+
+				printf("nbytes: %ld\n", nbytes);
+				printf("size: %ld\n", size);
+
+				while(nbytes < size) {
+					nbytes += readMessage(fsfd, message);
+					printf("nbytes: %ld\n", nbytes);
+					if(fputs(message, fp) < 0) {
+						exit(1);
+					}
+				}
+
+				fclose(fp);
 
 				puts("File retrieve succeeded");
 			}
-			else if(strcmp(status, "NOK") == 0){
+			else if(strcmp(message, "NOK") == 0){
 				puts(NOK_MESSAGE);
 			}
-			else if(strcmp(status, "INV") == 0){
+			else if(strcmp(message, "INV") == 0){
 				puts(TID_MESSAGE);
 			}
-			else if(strcmp(status, "EOF") == 0){
+			else if(strcmp(message, "EOF") == 0){
 				puts(EOF_MESSAGE);
 			}
 			else{
