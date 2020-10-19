@@ -59,8 +59,8 @@ void parseArgs(long argc, char* const argv[]) {
     }
 }
 
-void writeMessage(int fd, char *msg) {
-	ssize_t nleft, nwritten;
+long writeMessage(int fd, char *msg) {
+	ssize_t nleft, nwritten, ntotal = 0;
 	char *ptr;
 	ptr = msg;
 	nleft = strlen(msg);
@@ -71,9 +71,12 @@ void writeMessage(int fd, char *msg) {
 		if(nwritten <= 0) {
 			exit(1);
 		}
+		ntotal += nwritten;
 		nleft -= nwritten;
 		ptr += nwritten;
 	}
+
+	return ntotal;
 } 
 
 long readMessage(int fd, char *msg) {
@@ -312,8 +315,8 @@ int main(int argc, char *argv[]) {
 				ntotal = 0;
 				nleft = 11;
 
-				while(nleft > 0) {
-					nread = read(fsfd, ptr, nleft);
+				while(1) {
+					nread = read(fsfd, ptr, 1);
 
 					if(nread == -1) {
 						exit(1);
@@ -327,24 +330,27 @@ int main(int argc, char *argv[]) {
 						break;
 					}
 					ptr += nread;
-
 				}
-				fsize[ntotal] = '\0';
 
 				size = strtol(fsize, NULL, 10);
 				long nbytes = 0;
 
-				FILE *fp = fopen(Fname, "w");
+				FILE *fp = fopen(Fname, "wb");
 
-				printf("nbytes: %ld\n", nbytes);
-				printf("size: %ld\n", size);
+				while(nbytes < (size+1)) {
+					nread = read(fsfd, message, 511);
+					message[nread] = '\0';
+					nbytes += nread;
 
-				while(nbytes < size) {
-					nbytes += readMessage(fsfd, message);
-					printf("nbytes: %ld\n", nbytes);
+					if(nbytes == (size+1)) {
+						message[nread-1] = '\0';
+					}
+
 					if(fputs(message, fp) < 0) {
 						exit(1);
 					}
+
+					nleft -= nread;
 				}
 
 				fclose(fp);
@@ -378,7 +384,7 @@ int main(int argc, char *argv[]) {
 
 			sprintf(message, "UPL %s %s %s ", UID, TID, Fname);
 
-			FILE *fp = fopen(Fname, "r");
+			FILE *fp = fopen(Fname, "rb");
 
 			if(fp == NULL) {
 				puts("File not available");
@@ -390,10 +396,14 @@ int main(int argc, char *argv[]) {
 				fseek(fp, 0, SEEK_SET);
 				sprintf(message, "%ld ", size);
 				writeMessage(fsfd, message);
+				long nbytes = 0;
 
-				while(fgets(message, 512, fp) != NULL) {
-					writeMessage(fsfd, message);
+				while(nbytes < size) {
+					fgets(message, 512, fp);
+					nbytes += writeMessage(fsfd, message);
 				}
+
+				writeMessage(fsfd, "\n");
 
 				fclose(fp);
 
