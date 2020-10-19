@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
 	char arg1[128], arg2[128];
 	int c;
 
+	//command vars
 	char Fname[25];
 	char TID[5];
 	char Fop;
