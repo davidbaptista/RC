@@ -1,0 +1,314 @@
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <ctype.h>
+#include <dirent.h>
+
+#define DEFAULT_AS_PORT "58002"
+#define DEFAULT_FS_PORT "59002"
+
+#define BUFFER_SIZE 1024
+#define COMMAND_SIZE 4
+#define UID_SIZE 6
+#define TID_SIZE 5
+#define FNAME_SIZE 25
+
+#define PROTOCOL_ERROR_MESSAGE "Error: Command not supported"
+
+#define bool int
+#define true 1
+#define false 0
+
+#define max(A, B) ((A) >= (B)?(A):(B))
+
+char *fsPort = NULL;
+char *asIP = NULL;
+char *asPort = NULL;
+
+bool verbose = false;
+
+static void parseArgs(long argc, char* const argv[]) {
+    char c;
+
+    fsPort = DEFAULT_FS_PORT;
+    asIP = argv[1];
+    asPort = DEFAULT_AS_PORT;
+
+    while ((c = getopt(argc, argv, "q:n:p:v")) != -1){
+        switch (c) {
+            case 'q':
+                fsPort = optarg;
+                break;
+            case 'n':
+                asIP = optarg;
+                break;
+            case 'p':
+                asPort = optarg;
+                break;
+			case 'v':
+				verbose = true;
+				break;
+        }
+    }
+}
+
+long writeMessage(int fd, char *msg, long int msgSize) {
+	ssize_t nleft, nwritten, ntotal = 0;
+	char *ptr;
+	ptr = msg;
+	nleft = msgSize;
+
+	while(nleft > 0) {
+		nwritten = write(fd, ptr, nleft);
+
+		if(nwritten <= 0) {
+			exit(1);
+		}
+		ntotal += nwritten;
+		nleft -= nwritten;
+		ptr += nwritten;
+	}
+
+	return ntotal;
+} 
+
+long readMessage(int fd, char *msg) {
+	ssize_t nleft, nread, ntotal = 0;
+	char *ptr;
+	ptr = msg;
+	nleft = BUFFER_SIZE;
+
+	while(nleft > 0) {
+		nread = read(fd, ptr, nleft);
+
+		if(nread == -1) {
+			exit(1);
+		}
+		else if(nread == 0) {
+			break;
+		}
+
+		nleft -= nread;
+		ntotal += nread;
+		if(ptr[nread-1] == '\n'){
+			break;
+		}
+		ptr += nread;
+	}
+
+	ptr[nread] = '\0';
+
+	return ntotal;
+}
+
+int main(int argc, char *argv[]) {
+    int asfd, fsfd, newfd;
+	char UID[UID_SIZE];
+	char TID[TID_SIZE];
+	char buffer[BUFFER_SIZE];
+	char command[COMMAND_SIZE];
+	struct sigaction act;
+    struct sockaddr_in asaddr, fsaddr;
+    struct addrinfo ashints, *asres, fshints, *fsres;
+    socklen_t asaddrlen, fsaddrlen;
+	act.sa_handler = SIG_IGN;
+	pid_t pid;
+	ssize_t n;
+
+    parseArgs(argc, argv);
+
+	if(sigaction(SIGCHLD, &act, NULL) == -1) {
+		exit(1);
+	}
+
+    asfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
+    if(asfd == -1) {
+        exit(1);
+    }
+
+	fsfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(fsfd == -1) {
+		exit(1);
+	}
+
+    memset(&ashints, 0, sizeof(ashints));
+    ashints.ai_family=AF_INET; // IPv4
+    ashints.ai_socktype=SOCK_DGRAM; // UDP
+	ashints.ai_flags=AI_PASSIVE;
+
+	memset(&fshints, 0, sizeof(fshints));
+    fshints.ai_family=AF_INET; // IPv4
+    fshints.ai_socktype=SOCK_STREAM; // TCP
+	fshints.ai_flags=AI_PASSIVE;
+
+    if(getaddrinfo(asIP, asPort, &ashints, &asres) != 0) {
+		perror("getaddrinfo()");
+        exit(1);
+	}
+
+	if(getaddrinfo(NULL, fsPort, &fshints, &fsres) != 0) {
+		perror("getaddrinfo()");
+		exit(1);
+	}
+
+	if(bind(fsfd, fsres->ai_addr, fsres->ai_addrlen) == -1) {
+        perror("bind()");
+		exit(1);
+	}
+
+	if(listen(fsfd, 128) == -1) {
+		perror("listen()");
+		exit(1);
+	}
+
+    while (true) {
+		fsaddrlen = sizeof(fsaddrlen);
+
+		do {
+			newfd = accept(fsfd, (struct sockaddr*)&fsaddr, &fsaddrlen);
+		} while(newfd == -1 && errno == EINTR);
+
+		if(newfd == -1) {
+			perror("accept()");
+			exit(1);
+		}
+
+		if((pid=fork()) == -1) {
+			perror("fork()");
+			exit(1);
+		}
+		else if(pid == 0) {
+			close(fsfd);
+
+			char Fop;
+			char FName[11];
+			while(readMessage(newfd, buffer)) {
+				sscanf(buffer, "%s %s %s", command, UID, TID);
+				
+				if(strlen(UID) == 5 && strlen(TID) == 4) {
+					if(strcmp(command, "LST") == 0) {
+						strcpy(command, "RLS");
+					}
+					else if(strcmp(command, "RTV") == 0) {
+						strcpy(command, "RRT");
+					}
+					else if(strcmp(command, "UPL") == 0) {
+						strcpy(command, "RUP");
+					}
+					else if(strcmp(command, "DEL") == 0) {
+						strcpy(command, "RDL");
+					}
+					else if(strcmp(command, "REM") == 0) {
+						strcpy(command, "RRM");
+					}
+					else {
+						writeMessage(newfd, "ERR\n", 4);
+						break;
+					}
+
+					sprintf("VLD %s %s\n", UID, TID);
+
+					n = sendto(asfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asaddr, asaddrlen);
+
+					if(n < 0) {
+						exit(1);
+					}
+
+					n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, asaddrlen);
+
+					if(n < 0) {
+						exit(1);
+					}
+
+					sscanf(buffer, "%s %s %s %c %s", buffer, UID, TID, Fop, FName);
+					DIR *d;
+					struct dirent *dir;
+					char dirname[12];
+					sprintf(dirname, "USERS/%s", UID);
+					switch(Fop) {
+						case 'L':
+							d = opendir(dirname);
+							
+							if(d) {
+								char aux[BUFFER_SIZE];
+								int i = 0;
+								FILE *fp;
+
+								while((dir = readdir(d)) != NULL) {
+									i++;
+									fp = fopen(dir->d_name, "rb");
+
+									if(fp == NULL) {
+										perror("fopen()");
+										exit(1);
+									}
+
+									if(fseek(fp, 0, SEEK_END) < 0) {
+										perror("fseek()");
+										exit(1);
+									}
+									
+									long size = ftell(fp);
+
+									if(size < 0) {
+										perror("ftell()");
+										exit(1);
+									}
+									if(fseek(fp, 0, SEEK_SET) < 0) {
+										perror("fseek()");
+										exit(1);
+									}
+
+									if(fclose(fp) < 0) {
+										perror("fclose()");
+										exit(1);
+									}
+									
+									sprintf(aux, "%s %s %ld", aux, dir->d_name, size);
+								}
+								if(i > 0) {
+									sprintf(buffer, "RLS %d %s\n", i, aux);
+								}
+								else {
+									sprintf(buffer, "RLS EOF\n");
+								}
+							}
+							else {
+								sprintf(buffer, "RLS EOF\n");
+							}
+							break;
+						case 'R':
+							break;
+						case 'D':
+							break;
+						case 'U':
+							break;
+						case 'X':
+							break;
+						case 'E':
+							sprintf(buffer, "%s INV\n", command);
+							break;
+						default:
+							sprintf(buffer, "%s ERR\n", command);
+							break;
+					}
+				}
+			}
+		}
+    }
+
+    freeaddrinfo(asres);
+	freeaddrinfo(fsres);
+    close(asfd);
+	close(fsres);
+    exit(0);
+}
