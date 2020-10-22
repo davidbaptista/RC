@@ -13,6 +13,8 @@
 #define DEFAULT_PD_PORT "57002"
 #define DEFAULT_AS_PORT "58002"
 
+#define PROTOCOL_ERROR_MESSAGE "Error: Command not supported"
+
 #define bool int
 #define true 1
 #define false 0
@@ -62,7 +64,6 @@ int main(int argc, char *argv[]) {
     ssize_t n;
 	fd_set fds;	
     socklen_t asaddrlen, pdaddrlen;
-
 
     parseArgs(argc, argv);
 
@@ -116,11 +117,20 @@ int main(int argc, char *argv[]) {
 			n = recvfrom(pdfd, buffer, 128, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 			buffer[n]= '\0';
 
-            c = sscanf(buffer, "%s %s %s", command, arg1, arg2);
 
-            if(strcmp(arg1,UID) == 0) {
-                strcpy(msg, "RVC OK\n");
+			char Fop[2];
+			char FName[25];
+            c = sscanf(buffer, "%s %s %s %s %s", command, arg1, arg2, Fop, FName);
+
+            if(strcmp(arg1, UID) == 0) {
+				sprintf(msg, "RVC %s OK\n", UID);
                 printf("VLC=%s\n", arg2);
+				if(strcmp(Fop, "R") == 0 || strcmp(Fop, "U") == 0 || strcmp(Fop, "D") == 0) {
+					printf("%s %s\n", Fop, FName);
+				}
+				else {
+					printf("%s\n", Fop);
+				}
             }
 			else {
                 strcpy(msg,"RVC NOK\n");
@@ -130,7 +140,6 @@ int main(int argc, char *argv[]) {
             if(n == -1) {
                 exit(1);
             }
-
         }
         if(FD_ISSET(0, &fds)){
             fgets(line, sizeof(line), stdin);
@@ -156,13 +165,14 @@ int main(int argc, char *argv[]) {
 
                     if(!strcmp(buffer, "RUN OK\n")) {
                         reg = false;
+						puts("Unregister was successful");
                     }
-
-                    write(1, "echo: ", 6);	// temporary
-                    write(1, buffer, n);	// temporary
+					else {
+						puts("Unregister was not successful");
+					}
                 }
 				else {
-					puts("User is unregistered");	// temporary
+					puts("User is already unregistered. Nothing was done");
 				}
             }
             else if (c == 3 && strcmp(command, "reg") == 0 && strlen(arg1) == 5 && strlen(arg2) == 8) {
@@ -185,13 +195,14 @@ int main(int argc, char *argv[]) {
                     reg = true;
                     strcpy(UID,arg1);
                     strcpy(pass,arg2);
+					puts("Registered user successfully");
                 }
-
-                write(1, "echo: ", 6); 	// temporary
-                write(1, buffer, n);	// temporary
+				else {
+					puts("Registration was not successful");
+				}
             }
 			else {
-				puts("Command unknown"); 	// temporary	
+				puts(PROTOCOL_ERROR_MESSAGE);
 			}
         }
     }

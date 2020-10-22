@@ -19,6 +19,10 @@
 #define ERR_MESSAGE "Error: Operation failed"
 #define TID_MESSAGE "Error: Wrong TID"
 #define EOF_MESSAGE "Error: File is not available"
+#define ELOG_MESSAGE "Error: There was no established login"
+#define EPD_MESSAGE "Error: AS could not communicate with PD"
+#define EUSER_MESSAGE "Error: Provided UID is incorrect"
+#define EFOP_MESSAGE "Error: Provided file operation is non existent"
 #define PROTOCOL_ERROR_MESSAGE "Error: Command not supported"
 
 #define MESSAGE_SIZE 512
@@ -59,11 +63,11 @@ void parseArgs(long argc, char* const argv[]) {
     }
 }
 
-long writeMessage(int fd, char *msg) {
+long writeMessage(int fd, char *msg, long int msgSize) {
 	ssize_t nleft, nwritten, ntotal = 0;
 	char *ptr;
 	ptr = msg;
-	nleft = strlen(msg);
+	nleft = msgSize;
 
 	while(nleft > 0) {
 		nwritten = write(fd, ptr, nleft);
@@ -113,7 +117,7 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in addr;
 	struct addrinfo ashints, fshints, *asres, *fsres;
 	int n;
-	int RID;
+	int RID = -1;
 	int asfd, fsfd;
 	char UID[6], pass[9];
 
@@ -166,7 +170,7 @@ int main(int argc, char *argv[]) {
 		if(strcmp(command, "login") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
 			sprintf(message, "LOG %s %s\n", arg1, arg2);
 
-			writeMessage(asfd, message);
+			writeMessage(asfd, message, strlen(message));
 			readMessage(asfd, message);
 
 			if(strcmp(message, "RLO OK\n")==0) {
@@ -184,11 +188,11 @@ int main(int argc, char *argv[]) {
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "L") == 0 || strcmp(arg1, "D") == 0 || strcmp(arg1, "X") == 0) {
 				if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
 					sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
-					writeMessage(asfd, message);
+					writeMessage(asfd, message, strlen(message));
 				}
 				else {
 					sprintf(message, "REQ %s %04d %s\n", UID, RID, arg1);
-					writeMessage(asfd, message);
+					writeMessage(asfd, message, strlen(message));
 				}
 
 				readMessage(asfd, message);
@@ -199,6 +203,18 @@ int main(int argc, char *argv[]) {
 						strcpy(Fname, arg2);
 					}
 				}
+				else if(strcmp(message, "RRQ ELOG\n") == 0) {
+					puts(ELOG_MESSAGE);
+				}
+				else if(strcmp(message, "RRQ EPD\n") == 0) {
+					puts(EPD_MESSAGE);
+				}
+				else if(strcmp(message, "RRQ EUSER\n") == 0) {
+					puts(EUSER_MESSAGE);
+				}
+				else if(strcmp(message, "RRQ EFOP\n") == 0) {
+					puts(EFOP_MESSAGE);
+				}
 				else {
 					puts(ERR_MESSAGE);
 				}
@@ -208,8 +224,12 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		else if(strcmp(command, "val") == 0) {
+			if(RID == -1) {
+				puts("No request has been made");
+				continue;
+			}
 			sprintf(message, "AUT %s %04d %s\n", UID, RID, arg1);
-			writeMessage(asfd, message);
+			writeMessage(asfd, message, strlen(message));
 
 			readMessage(asfd, message);
 			sscanf(message, "%s %s", arg1, arg2);
@@ -226,15 +246,13 @@ int main(int argc, char *argv[]) {
 			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
-
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
 			if(n == -1) {
 				exit(1);
 			}
-
 			sprintf(message, "LST %s %s\n", UID, TID);
-	
-			writeMessage(fsfd, message);
+
+			writeMessage(fsfd, message, strlen(message));
 			readMessage(fsfd, message);
 
 			if(strcmp(message, "RDL NOK\n") == 0){
@@ -258,6 +276,7 @@ int main(int argc, char *argv[]) {
 				nfiles = strtol(p, NULL, 10);
 				p = strtok(NULL, " ");
 
+
 				for(p; p != NULL; p = strtok(NULL, " ")) {
 					printf("%d - ", i);
 					printf("%s ", p);
@@ -274,7 +293,7 @@ int main(int argc, char *argv[]) {
 
 			close(fsfd);
 		}
-		else if(strcmp(command, "retrieve") == 0) {
+		else if(strcmp(command, "retrieve") == 0 || strcmp(command, "r") == 0) {
 			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -284,7 +303,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			sprintf(message, "RTV %s %s %s\n", UID, TID, Fname);
-			writeMessage(fsfd, message);
+			writeMessage(fsfd, message, strlen(message));
 
 			ssize_t nleft = 7, nread, ntotal = 0;
 			char *ptr = message;
@@ -332,25 +351,27 @@ int main(int argc, char *argv[]) {
 					ptr += nread;
 				}
 
+				fsize[ntotal] = '\0';
+
 				size = strtol(fsize, NULL, 10);
 				long nbytes = 0;
 
 				FILE *fp = fopen(Fname, "wb");
 
+
 				while(nbytes < (size+1)) {
-					nread = read(fsfd, message, 511);
-					message[nread] = '\0';
+					nread = read(fsfd, message, 512);
 					nbytes += nread;
 
 					if(nbytes == (size+1)) {
 						message[nread-1] = '\0';
 					}
 
-					if(fputs(message, fp) < 0) {
+					if(fwrite(message, 1, nread, fp) < 0) {
 						exit(1);
 					}
 
-					nleft -= nread;
+					bzero(message, MESSAGE_SIZE);
 				}
 
 				fclose(fp);
@@ -390,20 +411,22 @@ int main(int argc, char *argv[]) {
 				puts("File not available");
 			}
 			else {
-				writeMessage(fsfd, message);
+				writeMessage(fsfd, message, strlen(message));
 				fseek(fp, 0, SEEK_END);
 				long size = ftell(fp);
 				fseek(fp, 0, SEEK_SET);
 				sprintf(message, "%ld ", size);
-				writeMessage(fsfd, message);
+				writeMessage(fsfd, message, strlen(message));
 				long nbytes = 0;
+				puts(message);
 
 				while(nbytes < size) {
-					fgets(message, 512, fp);
-					nbytes += writeMessage(fsfd, message);
+					fread(message, 1, MESSAGE_SIZE, fp);
+					nbytes += writeMessage(fsfd, message, MESSAGE_SIZE);
+					bzero(message, MESSAGE_SIZE);
 				}
 
-				writeMessage(fsfd, "\n");
+				writeMessage(fsfd, "\n", 1);
 
 				fclose(fp);
 
@@ -437,18 +460,22 @@ int main(int argc, char *argv[]) {
 			}
 
 			sprintf(message, "DEL %s %s %s\n", UID, TID, Fname);
-			writeMessage(fsfd, message);
+			writeMessage(fsfd, message, strlen(message));
 			readMessage(fsfd, message);
 
 			if(strcmp(message, "RDL OK\n") == 0){
 				puts("Operation succeeded");
-			}else if(strcmp(message, "RDL NOK\n") == 0){
+			}
+			else if(strcmp(message, "RDL NOK\n") == 0){
 				puts(NOK_MESSAGE);
-			}else if(strcmp(message, "RDL EOF\n") == 0){
+			}
+			else if(strcmp(message, "RDL EOF\n") == 0){
 				puts(EOF_MESSAGE);
-			}else if(strcmp(message, "RDL INV\n") == 0){
+			}
+			else if(strcmp(message, "RDL INV\n") == 0){
 				puts(TID_MESSAGE);
-			}else{
+			}
+			else{
 				puts(ERR_MESSAGE);
 			}
 
@@ -466,7 +493,7 @@ int main(int argc, char *argv[]) {
 
 			sprintf(message, "REM %s %s\n", UID, TID);
 			
-			writeMessage(fsfd, message);
+			writeMessage(fsfd, message, strlen(message));
 			readMessage(fsfd, message);
 
 			if(strcmp(message, "RRM OK\n") == 0){
