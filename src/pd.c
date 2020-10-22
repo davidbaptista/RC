@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 
             if(strcmp(arg1, UID) == 0) {
 				sprintf(msg, "RVC %s OK\n", UID);
-                printf("VLC=%s\n", arg2);
+                printf("VLC=%s, ", arg2);
 				if(strcmp(Fop, "R") == 0 || strcmp(Fop, "U") == 0 || strcmp(Fop, "D") == 0) {
 					printf("%s %s\n", Fop, FName);
 				}
