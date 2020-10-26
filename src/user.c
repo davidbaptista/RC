@@ -358,14 +358,9 @@ int main(int argc, char *argv[]) {
 
 				FILE *fp = fopen(Fname, "wb");
 
-
-				while(nbytes < (size+1)) {
-					nread = read(fsfd, message, 512);
+				while(nbytes < size) {
+					nread = read(fsfd, message, MESSAGE_SIZE);
 					nbytes += nread;
-
-					if(nbytes == (size+1)) {
-						message[nread-1] = '\0';
-					}
 
 					if(fwrite(message, 1, nread, fp) < 0) {
 						exit(1);
