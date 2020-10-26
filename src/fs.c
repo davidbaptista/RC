@@ -81,11 +81,11 @@ long writeMessage(int fd, char *msg, long int msgSize) {
 	return ntotal;
 } 
 
-long readMessage(int fd, char *msg) {
+long readMessage(int fd, char *msg, long int msgSize) {
 	ssize_t nleft, nread, ntotal = 0;
 	char *ptr;
 	ptr = msg;
-	nleft = BUFFER_SIZE;
+	nleft = msgSize;
 
 	while(nleft > 0) {
 		nread = read(fd, ptr, nleft);
@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
 
 			char Fop;
 			char FName[11];
-			while(readMessage(newfd, buffer)) {
+			while(readMessage(newfd, buffer, (long)14)) {
 				sscanf(buffer, "%s %s %s", command, UID, TID);
 				
 				if(strlen(UID) == 5 && strlen(TID) == 4) {
@@ -285,12 +285,164 @@ int main(int argc, char *argv[]) {
 							else {
 								sprintf(buffer, "RLS EOF\n");
 							}
+							writeMessage(newfd, buffer, strlen(buffer));
 							break;
 						case 'R':
+							d = opendir(dirname);
+							FILE *fp == NULL;
+							if(d) {
+								sprintf(buffer, "%s/%s", dirname, Fname);
+								fp = fopen(buffer, "rb");
+
+								if(fp == NULL) {
+									sprintf(buffer, "RRT EOF\n");
+									writeMessage(newfd, buffer, strlen(buffer));
+									break;
+								}
+
+								if(fseek(fp, 0, SEEK_END) < 0) {
+									perror("fseek()");
+									exit(1);
+								}
+
+								long size = ftell(fp);
+
+								if(size < 0) {
+									perror("ftell()");
+									exit(1);
+								}
+
+								if(fseek(fp, 0, SEEK_SET) < 0) {
+									perror("fseek()");
+									exit(1);
+								}
+
+								sprintf(buffer, "RRT OK %s ", size);
+
+								writeMessage(newfd, buffer, strlen(buffer));
+
+								long nbytes = 0;
+			
+								while(nbytes < size) {
+									fread(buffer, 1, BUFFER_SIZE, fp);
+									nbytes += writeMessage(newfd, buffer, BUFFER_SIZE);
+									bzero(buffer, BUFFER_SIZE);
+								}
+
+								writeMessage(newfd, "\n", 1);
+							}
+							else {
+								if(fclose(fp) < 0) {
+									perror("fclose()");
+									exit(1);
+								}
+							}
+							}
+							else {
+								sprintf(buffer, "RRT NOK\n");
+								writeMessage(newfd, buffer, strlen(buffer));
+							}
 							break;
 						case 'D':
+							d = opendir(dirname);
+							FILE *fp == NULL;
+							if(d) {
+								sprintf(buffer, "%s/%s", dirname, Fname);
+
+								if(remove(buffer) == 0){
+									writeMessage(newfd, "RDL OK\n", (long) 7);
+								}
+								else{
+									writeMessage(newfd, "RDL EOF\n", (long) 8);
+								}
+							}
+							else{
+								writeMessage(newfd, "RDL NOK\n", (long) 8);
+							}
 							break;
 						case 'U':
+							int count = 0; 
+							int dup = 0;
+							d = opendir(dirname);
+
+							if(!d){
+								mkdir(dirname);
+								d = opendir(dirname);
+							}
+
+							while((dir = readdir(d)) != NULL) {
+								if(strcmp(dir->d_name, FName) == 0){
+									dup = 1;
+									break;
+								}
+								count++;
+							}
+
+							if(dup == 1){
+								writeMessage(newfd, "RUP DUP\n", (long)8);
+								break;
+							}
+
+							if(count >= 15){
+								writeMessage(newfd, "RUP FULL\n", (long)9);
+								break;
+							}
+							
+							FILE* fp;
+
+							sprintf(buffer, "%s/%s", dirname, Fname);
+
+							fp = fopen(buffer, "wb");
+
+							if(fp == NULL) {
+								perror(fopen())
+								exit(1);
+							}
+
+							char fsize[11];
+							long size;
+
+							char *ptr = fsize;
+							ntotal = 0;
+							nleft = 11;
+
+							while(1) {
+								nread = read(newfs, ptr, 1);
+
+								if(nread == -1) {
+									exit(1);
+								}
+								else if(nread == 0) {
+									break;
+								}
+								nleft -= nread;
+								ntotal += nread;
+								if(ptr[nread-1] == ' ') {
+									break;
+								}
+								ptr += nread;
+							}
+
+							fsize[ntotal] = '\0';
+
+							size = strtol(fsize, NULL, 10);
+							long nbytes = 0;
+
+							while(nbytes < (size+1)) {
+								nread = read(newfd, buffer, BUFFER_SIZE);
+								nbytes += nread;
+
+								if(nbytes == (size+1)) {
+									buffer[nread-1] = '\0';
+								}
+
+								if(fwrite(buffer, 1, nread, fp) < 0) {
+									exit(1);
+								}
+
+								bzero(buffer, BUFFER_SIZE);
+							}
+
 							break;
 						case 'X':
 							break;
@@ -301,6 +453,8 @@ int main(int argc, char *argv[]) {
 							sprintf(buffer, "%s ERR\n", command);
 							break;
 					}
+					
+					close(newfd);
 				}
 			}
 		}

@@ -418,8 +418,7 @@ int main(int argc, char *argv[]) {
 				sprintf(message, "%ld ", size);
 				writeMessage(fsfd, message, strlen(message));
 				long nbytes = 0;
-				puts(message);
-
+				
 				while(nbytes < size) {
 					fread(message, 1, MESSAGE_SIZE, fp);
 					nbytes += writeMessage(fsfd, message, MESSAGE_SIZE);
