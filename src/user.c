@@ -345,6 +345,9 @@ int main(int argc, char *argv[]) {
 					}
 					nleft -= nread;
 					ntotal += nread;
+
+					// le ate encontrar o espaco (ou seja ja leu os digitos todos do numero)
+					// TODO: validar o numero de digitos
 					if(ptr[nread-1] == ' ') {
 						break;
 					}
