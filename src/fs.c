@@ -289,9 +289,9 @@ int main(int argc, char *argv[]) {
 							break;
 						case 'R':
 							d = opendir(dirname);
-							FILE *fp == NULL;
+							FILE *fp = NULL;
 							if(d) {
-								sprintf(buffer, "%s/%s", dirname, Fname);
+								sprintf(buffer, "%s/%s", dirname, FName);
 								fp = fopen(buffer, "rb");
 
 								if(fp == NULL) {
@@ -330,13 +330,11 @@ int main(int argc, char *argv[]) {
 								}
 
 								writeMessage(newfd, "\n", 1);
-							}
-							else {
+
 								if(fclose(fp) < 0) {
 									perror("fclose()");
 									exit(1);
 								}
-							}
 							}
 							else {
 								sprintf(buffer, "RRT NOK\n");
@@ -345,9 +343,9 @@ int main(int argc, char *argv[]) {
 							break;
 						case 'D':
 							d = opendir(dirname);
-							FILE *fp == NULL;
+							FILE *fp = NULL;
 							if(d) {
-								sprintf(buffer, "%s/%s", dirname, Fname);
+								sprintf(buffer, "%s/%s", dirname, FName);
 
 								if(remove(buffer) == 0){
 									writeMessage(newfd, "RDL OK\n", (long) 7);
@@ -378,7 +376,7 @@ int main(int argc, char *argv[]) {
 								count++;
 							}
 
-							if(dup == 1){
+							if(dup == 1) {
 								writeMessage(newfd, "RUP DUP\n", (long)8);
 								break;
 							}
@@ -390,12 +388,12 @@ int main(int argc, char *argv[]) {
 							
 							FILE* fp;
 
-							sprintf(buffer, "%s/%s", dirname, Fname);
+							sprintf(buffer, "%s/%s", dirname, FName);
 
 							fp = fopen(buffer, "wb");
 
 							if(fp == NULL) {
-								perror(fopen())
+								perror("fopen()");
 								exit(1);
 							}
 
@@ -403,11 +401,12 @@ int main(int argc, char *argv[]) {
 							long size;
 
 							char *ptr = fsize;
-							ntotal = 0;
-							nleft = 11;
+							ssize_t ntotal = 0;
+							ssize_t nleft = 11;
+							ssize_t nread;
 
 							while(1) {
-								nread = read(newfs, ptr, 1);
+								nread = read(newfd, ptr, 1);
 
 								if(nread == -1) {
 									exit(1);
@@ -417,6 +416,7 @@ int main(int argc, char *argv[]) {
 								}
 								nleft -= nread;
 								ntotal += nread;
+
 								if(ptr[nread-1] == ' ') {
 									break;
 								}
@@ -428,13 +428,9 @@ int main(int argc, char *argv[]) {
 							size = strtol(fsize, NULL, 10);
 							long nbytes = 0;
 
-							while(nbytes < (size+1)) {
+							while(nbytes < size) {
 								nread = read(newfd, buffer, BUFFER_SIZE);
 								nbytes += nread;
-
-								if(nbytes == (size+1)) {
-									buffer[nread-1] = '\0';
-								}
 
 								if(fwrite(buffer, 1, nread, fp) < 0) {
 									exit(1);
@@ -445,6 +441,31 @@ int main(int argc, char *argv[]) {
 
 							break;
 						case 'X':
+							d = opendir(dirname);
+							FILE *fp = NULL;
+							if(d) {
+								bool ok = true;
+								while((dir = readdir(d)) != NULL) {
+									sprintf(buffer, "%s/%s", dirname, dir);
+
+									if(remove(buffer) != 0) {
+										ok = false;
+									}
+								}
+
+								if(rmdir(dirname) != 0) {
+									perror("rmdir()");
+									exit(1);
+								}
+
+								if(ok) {
+									writeMessage(newfd, "REM OK\n", (long) 7);
+								}
+
+							}
+							else {
+								writeMessage(newfd, "RRM NOK\n", (long) 8);
+							}
 							break;
 						case 'E':
 							sprintf(buffer, "%s INV\n", command);
