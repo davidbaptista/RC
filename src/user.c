@@ -91,6 +91,7 @@ long readMessage(int fd, char *msg) {
 
 	while(nleft > 0) {
 		nread = read(fd, ptr, nleft);
+		puts(ptr);
 
 		if(nread == -1) {
 			exit(1);
@@ -165,7 +166,6 @@ int main(int argc, char *argv[]) {
 		fgets(line, sizeof(line), stdin);
 
 		c = sscanf(line, "%s %s %s", command, arg1, arg2);
-
 
 		if(strcmp(command, "login") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
 			sprintf(message, "LOG %s %s\n", arg1, arg2);
@@ -247,7 +247,9 @@ int main(int argc, char *argv[]) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
+
 			if(n == -1) {
+				perror("connect()");
 				exit(1);
 			}
 			sprintf(message, "LST %s %s\n", UID, TID);

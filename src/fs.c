@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -123,6 +124,7 @@ int main(int argc, char *argv[]) {
 	act.sa_handler = SIG_IGN;
 	pid_t pid;
 	ssize_t n;
+	int ret;
 
     parseArgs(argc, argv);
 
@@ -174,6 +176,7 @@ int main(int argc, char *argv[]) {
 		fsaddrlen = sizeof(fsaddrlen);
 
 		do {
+			puts("waiting for accept");
 			newfd = accept(fsfd, (struct sockaddr*)&fsaddr, &fsaddrlen);
 		} while(newfd == -1 && errno == EINTR);
 
@@ -215,37 +218,55 @@ int main(int argc, char *argv[]) {
 						break;
 					}
 
-					sprintf("VLD %s %s\n", UID, TID);
-
-					n = sendto(asfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asaddr, asaddrlen);
+					sprintf(buffer, "VLD %s %s\n", UID, TID);
+					
+					n = sendto(asfd, buffer, strlen(buffer), 0, asres->ai_addr, asres->ai_addrlen);
+					if(verbose) {
+						puts(buffer);
+					}
 
 					if(n < 0) {
+						puts("sendto error");
 						exit(1);
 					}
 
-					n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, asaddrlen);
+					n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, &asaddrlen);
 
 					if(n < 0) {
+						puts("recvfrom error");
 						exit(1);
+					}
+
+					if(verbose) {
+						puts(buffer);
 					}
 
 					sscanf(buffer, "%s %s %s %c %s", buffer, UID, TID, Fop, FName);
+
 					DIR *d;
+					FILE *fp;
 					struct dirent *dir;
+					char aux[BUFFER_SIZE];
 					char dirname[12];
+					long size;
+					int count = 0; 
+					int dup = 0;
+					int i = 0;
+					char *ptr;
+					ssize_t nbytes;
+					ssize_t nleft;
+					ssize_t nread;
+
 					sprintf(dirname, "USERS/%s", UID);
+
 					switch(Fop) {
 						case 'L':
 							d = opendir(dirname);
 							
 							if(d) {
-								char aux[BUFFER_SIZE];
-								int i = 0;
-								FILE *fp;
-
 								while((dir = readdir(d)) != NULL) {
 									i++;
-									fp = fopen(dir->d_name, "rb");
+									fp = fopen(dir->d_name, "rb"); // FIX LATER
 
 									if(fp == NULL) {
 										perror("fopen()");
@@ -257,7 +278,7 @@ int main(int argc, char *argv[]) {
 										exit(1);
 									}
 									
-									long size = ftell(fp);
+									size = ftell(fp);
 
 									if(size < 0) {
 										perror("ftell()");
@@ -285,11 +306,13 @@ int main(int argc, char *argv[]) {
 							else {
 								sprintf(buffer, "RLS EOF\n");
 							}
+							puts(buffer);
 							writeMessage(newfd, buffer, strlen(buffer));
 							break;
 						case 'R':
 							d = opendir(dirname);
-							FILE *fp = NULL;
+							fp = NULL;
+
 							if(d) {
 								sprintf(buffer, "%s/%s", dirname, FName);
 								fp = fopen(buffer, "rb");
@@ -305,7 +328,7 @@ int main(int argc, char *argv[]) {
 									exit(1);
 								}
 
-								long size = ftell(fp);
+								size = ftell(fp);
 
 								if(size < 0) {
 									perror("ftell()");
@@ -321,7 +344,7 @@ int main(int argc, char *argv[]) {
 
 								writeMessage(newfd, buffer, strlen(buffer));
 
-								long nbytes = 0;
+								nbytes = 0;
 			
 								while(nbytes < size) {
 									fread(buffer, 1, BUFFER_SIZE, fp);
@@ -343,7 +366,8 @@ int main(int argc, char *argv[]) {
 							break;
 						case 'D':
 							d = opendir(dirname);
-							FILE *fp = NULL;
+							fp = NULL;
+
 							if(d) {
 								sprintf(buffer, "%s/%s", dirname, FName);
 
@@ -359,12 +383,12 @@ int main(int argc, char *argv[]) {
 							}
 							break;
 						case 'U':
-							int count = 0; 
-							int dup = 0;
+							count = 0; 
+							dup = 0;
 							d = opendir(dirname);
 
 							if(!d){
-								mkdir(dirname);
+								mkdir(dirname, 0777);
 								d = opendir(dirname);
 							}
 
@@ -386,8 +410,6 @@ int main(int argc, char *argv[]) {
 								break;
 							}
 							
-							FILE* fp;
-
 							sprintf(buffer, "%s/%s", dirname, FName);
 
 							fp = fopen(buffer, "wb");
@@ -398,12 +420,9 @@ int main(int argc, char *argv[]) {
 							}
 
 							char fsize[11];
-							long size;
 
-							char *ptr = fsize;
-							ssize_t ntotal = 0;
-							ssize_t nleft = 11;
-							ssize_t nread;
+							ptr = fsize;
+							nbytes = 0;
 
 							while(1) {
 								nread = read(newfd, ptr, 1);
@@ -414,8 +433,7 @@ int main(int argc, char *argv[]) {
 								else if(nread == 0) {
 									break;
 								}
-								nleft -= nread;
-								ntotal += nread;
+								nbytes += nread;
 
 								if(ptr[nread-1] == ' ') {
 									break;
@@ -423,10 +441,10 @@ int main(int argc, char *argv[]) {
 								ptr += nread;
 							}
 
-							fsize[ntotal] = '\0';
+							fsize[nbytes] = '\0';
 
 							size = strtol(fsize, NULL, 10);
-							long nbytes = 0;
+							nbytes = 0;
 
 							while(nbytes < size) {
 								nread = read(newfd, buffer, BUFFER_SIZE);
@@ -442,7 +460,7 @@ int main(int argc, char *argv[]) {
 							break;
 						case 'X':
 							d = opendir(dirname);
-							FILE *fp = NULL;
+
 							if(d) {
 								bool ok = true;
 								while((dir = readdir(d)) != NULL) {
@@ -476,14 +494,23 @@ int main(int argc, char *argv[]) {
 					}
 					
 					close(newfd);
+					exit(0);
 				}
 			}
+		}
+		do {
+			ret = close(newfd);
+		} while(ret == -1 && errno == EINTR);
+
+		if(ret == -1) {
+			perror("close()");
+			exit(1);
 		}
     }
 
     freeaddrinfo(asres);
 	freeaddrinfo(fsres);
     close(asfd);
-	close(fsres);
+	close(fsfd);
     exit(0);
 }
