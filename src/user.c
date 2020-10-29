@@ -91,7 +91,6 @@ long readMessage(int fd, char *msg) {
 
 	while(nleft > 0) {
 		nread = read(fd, ptr, nleft);
-		puts(ptr);
 
 		if(nread == -1) {
 			exit(1);
@@ -115,7 +114,6 @@ long readMessage(int fd, char *msg) {
 
 int main(int argc, char *argv[]) {
 	// connection vars
-	struct sockaddr_in addr;
 	struct addrinfo ashints, fshints, *asres, *fsres;
 	int n;
 	int RID = -1;
@@ -257,16 +255,16 @@ int main(int argc, char *argv[]) {
 			writeMessage(fsfd, message, strlen(message));
 			readMessage(fsfd, message);
 
-			if(strcmp(message, "RDL NOK\n") == 0){
+			if(strcmp(message, "RLS NOK\n") == 0){
 				puts(NOK_MESSAGE);
 			}
-			else if(strcmp(message, "RDL EOF\n") == 0){
-				puts(EOF_MESSAGE);
+			else if(strcmp(message, "RLS EOF\n") == 0){
+				puts("No files available");
 			}
-			else if(strcmp(message, "RDL INV\n") == 0){
+			else if(strcmp(message, "RLS INV\n") == 0){
 				puts(TID_MESSAGE);
 			}
-			else if(strcmp(message, "RDL ERR\n") == 0){
+			else if(strcmp(message, "RLS ERR\n") == 0){
 				puts(ERR_MESSAGE);
 			}
 			else {
@@ -279,7 +277,7 @@ int main(int argc, char *argv[]) {
 				p = strtok(NULL, " ");
 
 
-				for(p; p != NULL; p = strtok(NULL, " ")) {
+				for(; p != NULL; p = strtok(NULL, " ")) {
 					printf("%d - ", i);
 					printf("%s ", p);
 					p = strtok(NULL, " ");
@@ -296,7 +294,6 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 		}
 		else if(strcmp(command, "retrieve") == 0 || strcmp(command, "r") == 0) {
-			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -395,7 +392,6 @@ int main(int argc, char *argv[]) {
 		}
 
 		else if(strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) {
-			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -450,7 +446,6 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 		}
 		else if(strcmp(command, "delete") == 0 || strcmp(command, "d") == 0) {
-			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -482,7 +477,6 @@ int main(int argc, char *argv[]) {
 
 		}
 		else if(strcmp(command, "remove") == 0 || strcmp(command,"x") == 0) {
-			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);

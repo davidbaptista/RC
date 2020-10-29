@@ -14,10 +14,13 @@
 #include <ctype.h>
 #include <dirent.h>
 
+#pragma GCC diagnostic ignored "-Wformat-overflow"
+
 #define DEFAULT_AS_PORT "58002"
 #define DEFAULT_FS_PORT "59002"
 
 #define BUFFER_SIZE 1024
+#define AUX_SIZE 600
 #define COMMAND_SIZE 4
 #define UID_SIZE 6
 #define TID_SIZE 5
@@ -100,7 +103,7 @@ long readMessage(int fd, char *msg, long int msgSize) {
 
 		nleft -= nread;
 		ntotal += nread;
-		if(ptr[nread-1] == '\n'){
+		if(ptr[nread-1] == '\n') {
 			break;
 		}
 		ptr += nread;
@@ -176,7 +179,6 @@ int main(int argc, char *argv[]) {
 		fsaddrlen = sizeof(fsaddrlen);
 
 		do {
-			puts("waiting for accept");
 			newfd = accept(fsfd, (struct sockaddr*)&fsaddr, &fsaddrlen);
 		} while(newfd == -1 && errno == EINTR);
 
@@ -237,36 +239,43 @@ int main(int argc, char *argv[]) {
 						exit(1);
 					}
 
+					buffer[n] = '\0';
+
 					if(verbose) {
 						puts(buffer);
 					}
 
-					sscanf(buffer, "%s %s %s %c %s", buffer, UID, TID, Fop, FName);
+					sscanf(buffer, "CNF %s %s %c %s", UID, TID, &Fop, FName);
 
 					DIR *d;
 					FILE *fp;
 					struct dirent *dir;
-					char aux[BUFFER_SIZE];
+					char aux[AUX_SIZE];
 					char dirname[12];
 					long size;
-					int count = 0; 
 					int dup = 0;
 					int i = 0;
 					char *ptr;
 					ssize_t nbytes;
-					ssize_t nleft;
 					ssize_t nread;
 
-					sprintf(dirname, "USERS/%s", UID);
+					sprintf(dirname, "USERS/%s/", UID);
 
 					switch(Fop) {
 						case 'L':
 							d = opendir(dirname);
 							
 							if(d) {
+								i = 0;
+								strcpy(aux, "");
 								while((dir = readdir(d)) != NULL) {
 									i++;
-									fp = fopen(dir->d_name, "rb"); // FIX LATER
+									if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+										i--;
+										continue;
+									}
+									sprintf(buffer, "%s/%s", dirname, dir->d_name);
+									fp = fopen(buffer, "rb"); // FIX LATER
 
 									if(fp == NULL) {
 										perror("fopen()");
@@ -293,11 +302,17 @@ int main(int argc, char *argv[]) {
 										perror("fclose()");
 										exit(1);
 									}
-									
-									sprintf(aux, "%s %s %ld", aux, dir->d_name, size);
+
+									if(strlen(dir->d_name) > 24) {
+										printf("Error: filename too big %s", dir->d_name);
+										exit(1);
+									}
+									sprintf(buffer, " %s %ld", dir->d_name, size);
+									strcat(aux, buffer);
 								}
+
 								if(i > 0) {
-									sprintf(buffer, "RLS %d %s\n", i, aux);
+									sprintf(buffer, "RLS %d%s\n", i, aux);
 								}
 								else {
 									sprintf(buffer, "RLS EOF\n");
@@ -306,8 +321,12 @@ int main(int argc, char *argv[]) {
 							else {
 								sprintf(buffer, "RLS EOF\n");
 							}
-							puts(buffer);
 							writeMessage(newfd, buffer, strlen(buffer));
+
+							if(verbose) {
+								puts(buffer);
+							}
+
 							break;
 						case 'R':
 							d = opendir(dirname);
@@ -340,7 +359,7 @@ int main(int argc, char *argv[]) {
 									exit(1);
 								}
 
-								sprintf(buffer, "RRT OK %s ", size);
+								sprintf(buffer, "RRT OK %ld ", size);
 
 								writeMessage(newfd, buffer, strlen(buffer));
 
@@ -383,7 +402,7 @@ int main(int argc, char *argv[]) {
 							}
 							break;
 						case 'U':
-							count = 0; 
+							i = 0; 
 							dup = 0;
 							d = opendir(dirname);
 
@@ -397,7 +416,7 @@ int main(int argc, char *argv[]) {
 									dup = 1;
 									break;
 								}
-								count++;
+								i++;
 							}
 
 							if(dup == 1) {
@@ -405,7 +424,7 @@ int main(int argc, char *argv[]) {
 								break;
 							}
 
-							if(count >= 15){
+							if(i >= 15){
 								writeMessage(newfd, "RUP FULL\n", (long)9);
 								break;
 							}
@@ -464,7 +483,7 @@ int main(int argc, char *argv[]) {
 							if(d) {
 								bool ok = true;
 								while((dir = readdir(d)) != NULL) {
-									sprintf(buffer, "%s/%s", dirname, dir);
+									sprintf(buffer, "%s/%s", dirname, dir->d_name);
 
 									if(remove(buffer) != 0) {
 										ok = false;
