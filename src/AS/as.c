@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -13,6 +14,8 @@
 #include <netdb.h>
 #include <ctype.h>
 #include <dirent.h>
+
+#define max(A, B) ((A) >= (B)?(A):(B))
 
 #define bool int
 #define true 1
@@ -97,23 +100,31 @@ int main(int argc, char *argv[]) {
 	FILE *fp;
 	fd_set fds;	
 	ssize_t n;
-    socklen_t asaddrlen, pdaddrlen;
+	pid_t pid;
+    socklen_t asudpaddrlen, pdaddrlen, astcpaddrlen;
 	struct dirent *dir;
-    struct sockaddr_in asaddr, pdaddr;
-    struct addrinfo ashints, *asres, pdhints, *pdres;
+	struct sigaction act;
+    struct sockaddr_in asudpaddr, pdaddr, astcpaddr;
+    struct addrinfo asudphints, *asudpres, pdhints, *pdres, astcphints, *astcpres;
 	char *c;
 	char dirname[16];
 	char filename[32];
 	char buffer[BUFFER_SIZE];
 	char arg1[4], arg2[6], arg3[16], arg4[16], arg5[16];
 	int i;
-	int asfd, pdfd;
+	int ret;
+	int counter;
+	int asudpfd, pdfd, astcpfd, newfd;
 
-	int errcode;
+	act.sa_handler = SIG_IGN;
 
 	parseArgs(argc, argv);
 
-	if((asfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+	if(sigaction(SIGCHLD, &act, NULL) == -1) {
+		exit(1);
+	}
+
+	if((asudpfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("socket()");
 		exit(1);
 	}
@@ -122,128 +133,149 @@ int main(int argc, char *argv[]) {
 		perror("socket()");
 		exit(1);
 	}
+
+	if((astcpfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		perror("socket()");
+		exit(1);
+	}
 		
-	memset(&ashints, 0, sizeof(ashints));
+	memset(&asudphints, 0, sizeof(asudphints));
+	asudphints.ai_family = AF_INET;
+	asudphints.ai_socktype = SOCK_DGRAM;
+	asudphints.ai_flags = AI_PASSIVE;
 
-	ashints.ai_family = AF_INET;
-	ashints.ai_socktype = SOCK_DGRAM;
-	ashints.ai_flags = AI_PASSIVE;
+	memset(&pdhints, 0, sizeof(pdhints));
+    pdhints.ai_family=AF_INET;
+    pdhints.ai_socktype=SOCK_DGRAM; 
 
-	if((getaddrinfo(NULL, asPort, &ashints, &asres)) != 0) {
+	memset(&astcphints, 0, sizeof(astcphints));
+    astcphints.ai_family=AF_INET;
+    astcphints.ai_socktype=SOCK_STREAM; 
+	astcphints.ai_flags=AI_PASSIVE;
+
+	if((getaddrinfo(NULL, asPort, &asudphints, &asudpres)) != 0) {
 		perror("getaddrinfo()");
 		exit(1);
 	}
 
-	if(bind(asfd, asres->ai_addr, asres->ai_addrlen) == -1) {
+	if((getaddrinfo(NULL, asPort, &astcphints, &astcpres)) != 0) {
+		perror("getaddrinfo()");
+		exit(1);
+	}
+
+	if(bind(asudpfd, asudpres->ai_addr, asudpres->ai_addrlen) == -1) {
 		perror("bind()");
 		exit(1);
 	}
 
+	if(bind(astcpfd, astcpres->ai_addr, astcpres->ai_addrlen) == -1) {
+		perror("bind()");
+		exit(1);
+	}
+
+	if(listen(astcpfd, 128) == -1) {
+		perror("listen()");
+		exit(1);
+	}
+
 	while(true) {
-		asaddrlen = sizeof(asaddr);
+		FD_ZERO(&fds);
+		FD_SET(asudpfd, &fds);
+		FD_SET(astcpfd, &fds);
 
-		n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, &asaddrlen);
+		counter = select(max(asudpfd, astcpfd) + 1, &fds, (fd_set *) NULL, (fd_set *)NULL, (struct timeval *) NULL);
+ 		if(counter <= 0) {
+            exit(1);
+        }
 
-		if(n == -1) {
-			perror("recvfrom()");
-			exit(1);
-		}
+		if(FD_ISSET(asudpfd, &fds)) {
+			asudpaddrlen = sizeof(asudpaddr);
 
-		if(verbose) {
-			puts(buffer);
-		}
+			n = recvfrom(asudpfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asudpaddr, &asudpaddrlen);
 
-		sscanf(buffer, "%s ", arg1);
+			buffer[n] = '\0';
 
-		if(strcmp(arg1, "REG") == 0) {
-			n = sscanf(buffer, "%s %s %s %s %s", arg1, arg2, arg3, arg4, arg5);
+			if(n == -1) {
+				perror("recvfrom()");
+				exit(1);
+			}
 
-			if(n == 5) {
-				if(strlen(arg2) == 5 && strlen(arg3) == 8) {
-					int valid = true;
-					
-					// argument validation
-					c = arg2;
-					while(*c) {
-						if(isdigit(*c++) == 0) {
-							valid = false;
-							break;
-						}
-					}
+			if(verbose) {
+				puts(buffer);
+			}
 
-					c = arg3;
-					while(*c) {
-						if(isalnum(*c++) == 0) {
-							valid = false;
-							break;
-						}
-					}
+			sscanf(buffer, "%s ", arg1);
 
-					if(!valid) {
-						sendto(asfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+			if(strcmp(arg1, "REG") == 0) {
+				n = sscanf(buffer, "%s %s %s %s %s", arg1, arg2, arg3, arg4, arg5);
 
-						if(verbose) {
-							puts("RRG NOK");
-						}
-						continue;
-					}
-
-					sprintf(dirname, "AS/USERS/%s", arg2);
-
-					d = opendir(dirname);
-
-					if(!d) {
-						if(mkdir(dirname, 0777) != 0) {
-							perror("mkdir()");
-							exit(1);
-						}
-
-						d = opendir(dirname);
-					}
-					
-					if(d) {
-						sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
-
-						fp = fopen(filename, "r");
-
-						//first time user registration
-						if(fp == NULL) {
-							fp = fopen(filename, "w");
-
-							if(fp == NULL) {
-								perror("fopen()");
-								exit(1);
+				if(n == 5) {
+					if(strlen(arg2) == 5 && strlen(arg3) == 8) {
+						int valid = true;
+						
+						// argument validation
+						c = arg2;
+						while(*c) {
+							if(isdigit(*c++) == 0) {
+								valid = false;
+								break;
 							}
+						}
 
-							n = fwrite(arg3, 1, strlen(arg3), fp);
-
-							if(n != 8) {
-								perror("fwrite()");
-								fclose(fp);
-								exit(1);
+						c = arg3;
+						while(*c) {
+							if(isalnum(*c++) == 0) {
+								valid = false;
+								break;
 							}
+						}
 
-							n = sendto(asfd, "RRG OK\n", 7, 0, (struct sockaddr*)&asaddr, asaddrlen);
-
-							if(n == -1) {
-								perror("sendto()");
-								exit(1);
-							}
+						if(!valid) {
+							sendto(asudpfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
 							if(verbose) {
-								puts("RRG OK");
+								puts("RRG NOK");
+							}
+							continue;
+						}
+
+						sprintf(dirname, "AS/USERS/%s", arg2);
+
+						d = opendir(dirname);
+
+						if(!d) {
+							if(mkdir(dirname, 0777) != 0) {
+								perror("mkdir()");
+								exit(1);
 							}
 
-							fclose(fp);
+							d = opendir(dirname);
 						}
-						//user already registrated
-						else {
-							n = fread(buffer, 1, BUFFER_SIZE, fp);
-							buffer[n] = '\0';
+						
+						if(d) {
+							sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
 
-							//verifies user's credentials
-							if(strcmp(buffer, arg3) == 0) {
-								n = sendto(asfd, "RRG OK\n", 7, 0, (struct sockaddr*)&asaddr, asaddrlen);
+							fp = fopen(filename, "r");
+
+							//first time user registration
+							if(fp == NULL) {
+								fp = fopen(filename, "w");
+
+								if(fp == NULL) {
+									perror("fopen()");
+									exit(1);
+								}
+
+								n = fwrite(arg3, 1, strlen(arg3), fp);
+
+								if(n != 8) {
+									perror("fwrite()");
+
+									fclose(fp);
+									exit(1);
+								}
+
+								n = sendto(asudpfd, "RRG OK\n", 7, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
 								if(n == -1) {
 									perror("sendto()");
@@ -253,132 +285,93 @@ int main(int argc, char *argv[]) {
 								if(verbose) {
 									puts("RRG OK");
 								}
+
+								fclose(fp);
 							}
+							//user already registrated
 							else {
-								n = sendto(asfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+								n = fread(buffer, 1, BUFFER_SIZE, fp);
+								buffer[n] = '\0';
 
-								if(n == -1) {
-									perror("sendto()");
-									exit(1);
+								//verifies user's credentials
+								if(strcmp(buffer, arg3) == 0) {
+									n = sendto(asudpfd, "RRG OK\n", 7, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+									if(n == -1) {
+										perror("sendto()");
+										exit(1);
+									}
+
+									if(verbose) {
+										puts("RRG OK");
+									}
+								}
+								else {
+									n = sendto(asudpfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+									if(n == -1) {
+										perror("sendto()");
+										exit(1);
+									}
+
+									if(verbose) {
+										puts("RRG NOK");
+									}
 								}
 
-								if(verbose) {
-									puts("RRG NOK");
-								}
+								fclose(fp);
+							}
+							sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
+
+							fp = fopen(filename, "w");
+
+							if(fp == NULL) {
+								perror("fopen()");
+								exit(1);
+							}
+
+							sprintf(buffer, "%s %s", arg4, arg5);
+
+							n = fwrite(buffer, 1, strlen(buffer), fp);
+
+							if(n < 0) {
+								perror("fwrite()");
+								exit(1);
 							}
 
 							fclose(fp);
 						}
-						sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
-
-						fp = fopen(filename, "w");
-
-						if(fp == NULL) {
-							perror("fopen()");
+						else {
+							perror("opendir()");
 							exit(1);
-						}
-
-						sprintf(buffer, "%s %s", arg4, arg5);
-
-						n = fwrite(buffer, 1, strlen(buffer), fp);
-
-						if(n < 0) {
-							perror("fwrite()");
-							exit(1);
-						}
-
-						fclose(fp);
+						}					
 					}
-					else {
-						perror("opendir()");
-						exit(1);
-					}					
 				}
-			}
-			else {
-				n = sendto(asfd, "RRG ERR\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+				else {
+					n = sendto(asudpfd, "RRG ERR\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
-				if(n < 0) {
-					perror("sendto()");
-					exit(1);
-				}
-
-				if(verbose) {
-					puts("RRG ERR\n");
-				}
-			}
-
-		}
-		else if(strcmp(arg1, "UNR") == 0) {
-			n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
-
-			if(n==3){
-				sprintf(dirname, "AS/USERS/%s", arg2);
-
-				d = opendir(dirname);
-
-				//user doesnt exists
-				if(!d) {
-					sendto(asfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
 					if(n < 0) {
 						perror("sendto()");
 						exit(1);
 					}
 
 					if(verbose) {
-						puts("RUN NOK\n");
+						puts("RRG ERR\n");
 					}
 				}
-				//user exists
-				else{
-					sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
 
-					fp = fopen(filename, "r");
+			}
+			else if(strcmp(arg1, "UNR") == 0) {
+				n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
 
-					if(fp == NULL) {
-						perror("fopen()");
-						exit(1);
-					}
+				if(n==3){
+					sprintf(dirname, "AS/USERS/%s", arg2);
 
-					n = fread(buffer, 1, BUFFER_SIZE, fp);
-					buffer[n] = '\0';
+					d = opendir(dirname);
 
-					//verifies user's credentials
-					if(strcmp(buffer, arg3) == 0) {
-						bool ok = true;
-
-						//reads all files in user's directory
-						while((dir = readdir(d)) != NULL) {
-							sprintf(buffer, "%s/%s", dirname, dir->d_name);
-
-							if(remove(buffer) != 0) {
-								ok = false;
-							}
-						}
-
-						if(rmdir(dirname) != 0) {
-							perror("rmdir()");
-							exit(1);
-						}
-						
-
-						if(ok){
-							n = sendto(asfd, "RUN OK\n", 7, 0, (struct sockaddr*)&asaddr, asaddrlen);
-
-							if(n < 0) {
-								perror("sendto()");
-								exit(1);
-							}
-
-							if(verbose) {
-								puts("RUN OK\n");
-							}
-						}
-
-					}
-					//wrong pass
-					else{
-						sendto(asfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+					//user doesnt exist
+					if(!d) {
+						sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 						if(n < 0) {
 							perror("sendto()");
 							exit(1);
@@ -387,12 +380,85 @@ int main(int argc, char *argv[]) {
 						if(verbose) {
 							puts("RUN NOK\n");
 						}
+					}
+					//user exists
+					else{
+						sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
 
+						fp = fopen(filename, "r");
+
+						if(fp == NULL) {
+							perror("fopen()");
+							exit(1);
+						}
+
+						n = fread(buffer, 1, BUFFER_SIZE, fp);
+						buffer[n] = '\0';
+
+						//verifies user's credentials
+						if(strcmp(buffer, arg3) == 0) {
+							bool ok = true;
+
+							sprintf(buffer, "%s/%s_reg.txt", dirname, arg2);
+							if(remove(buffer) != 0) {
+								ok = false;
+							}			
+
+							if(ok) {
+								n = sendto(asudpfd, "RUN OK\n", 7, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+								if(n < 0) {
+									perror("sendto()");
+									exit(1);
+								}
+
+								if(verbose) {
+									puts("RUN OK\n");
+								}
+							}
+							else {
+								sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+								if(n < 0) {
+									perror("sendto()");
+									exit(1);
+								}
+
+								if(verbose) {
+									puts("RUN NOK\n");
+								}
+							}
+						}
+						//wrong pass
+						else{
+							sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+							if(n < 0) {
+								perror("sendto()");
+								exit(1);
+							}
+
+							if(verbose) {
+								puts("RUN NOK\n");
+							}
+						}
+					}
+				}
+				else{
+					n = sendto(asudpfd, "RUN ERR\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+					if(n < 0) {
+						perror("sendto()");
+						exit(1);
+					}
+
+					if(verbose) {
+						puts("RUN ERR\n");
 					}
 				}
 			}
-			else{
-				n = sendto(asfd, "RUN ERR\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+			else {
+				n = sendto(asudpfd, "ERR\n", 4, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
 				if(n < 0) {
 					perror("sendto()");
@@ -400,17 +466,113 @@ int main(int argc, char *argv[]) {
 				}
 
 				if(verbose) {
-					puts("RUN ERR\n");
-				}
-
+					puts("ERR\n");
+				}		
 			}
 		}
-		else {
-			// error
+		if(FD_ISSET(astcpfd, &fds)) {
+			astcpaddrlen = sizeof(astcpaddrlen);
+
+			do {
+				newfd = accept(astcpfd, (struct sockaddr*)&astcpaddr, &astcpaddrlen);
+			} while (newfd == -1 && errno == EINTR);			
+
+			if(newfd == -1) {
+				perror("accept()");
+				exit(1);
+			}
+
+			if((pid=fork()) == -1) {
+				perror("fork()");
+				exit(1);
+			}
+			else if(pid == 0) {
+				close(astcpfd);
+
+				readMessage(newfd, buffer);
+
+				sscanf(buffer, "%s ", arg1);
+
+				if(strcmp(arg1, "LOG") == 0) {
+					ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
+
+					if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
+						writeMessage(newfd, "RLO ERR\n", 8);
+						close(newfd);
+						exit(1);
+					}
+
+					sprintf(dirname, "AS/USERS/%s", arg2);
+
+					d = opendir(dirname);
+
+					if(!d) {
+						writeMessage(newfd, "RLO ERR\n", 8);
+						close(newfd);
+						exit(1);
+					}
+
+					sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
+
+					fp = fopen(filename, "r");
+
+					if(fp == NULL) {
+						writeMessage(newfd, "RLO ERR\n", 8);
+						close(newfd);
+						exit(1);
+					}
+
+					if(fclose(fp) != 0) {
+						perror("fclose()");
+						close(newfd);
+						exit(1);
+					}
+
+					sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
+
+					fp = fopen(filename, "r");
+
+					if(fp == NULL) {
+						writeMessage(newfd, "RLO ERR\n", 8);
+						close(newfd);
+						exit(1);
+					}
+
+					n = fread(buffer, 1, BUFFER_SIZE, fp);
+					buffer[n] = '\0';
+
+					if(strcmp(buffer, arg3) == 0) {
+						writeMessage(newfd, "RLO OK\n", 7);
+					}
+					else {
+						writeMessage(newfd, "RLO NOK\n", 8);
+					}
+
+					fclose(fp);
+				}
+				else if(strcmp(arg1, "REQ") == 0) {
+
+				}
+				else if(strcmp(arg1, "AUT") == 0) {
+
+				}
+
+
+				close(newfd);
+				exit(0);
+			}
+			do {
+				ret = close(newfd);
+			} while(ret == -1 && errno == EINTR);
+
+			if(ret == -1) {
+				perror("close()");
+				exit(1);
+			}
 		}
 	}
 
-	freeaddrinfo(asres);
-	close(asfd);
+	freeaddrinfo(asudpres);
+	close(asudpfd);
 	exit(0);
 }

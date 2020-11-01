@@ -148,15 +148,18 @@ int main(int argc, char *argv[]) {
 
 
 	if(getaddrinfo(asIP, asPort, &ashints, &asres) != 0) {
+		perror("getaddrinfo()");
         exit(1);
     }	
 
 	if(getaddrinfo(fsIP, fsPort, &fshints, &fsres) != 0) {
+		perror("getaddrinfo()");
         exit(1);
 	}
 
 	n = connect(asfd, asres->ai_addr, asres->ai_addrlen);
 	if(n == -1) {
+		perror("connect()");
 		exit(1);
 	}
 
@@ -177,6 +180,7 @@ int main(int argc, char *argv[]) {
 				puts("You are now logged in");
 			}
 			else {
+				printf("%s a\n", message);
 				puts("Login failed!");
 			}
 		}
