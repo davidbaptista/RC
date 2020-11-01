@@ -310,7 +310,100 @@ int main(int argc, char *argv[]) {
 
 		}
 		else if(strcmp(arg1, "UNR") == 0) {
+			n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
 
+			if(n==3){
+				sprintf(dirname, "AS/USERS/%s", arg2);
+
+				d = opendir(dirname);
+
+				//user doesnt exists
+				if(!d) {
+					sendto(asfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+					if(n < 0) {
+						perror("sendto()");
+						exit(1);
+					}
+
+					if(verbose) {
+						puts("RUN NOK\n");
+					}
+				}
+				//user exists
+				else{
+					sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
+
+					fp = fopen(filename, "r");
+
+					if(fp == NULL) {
+						perror("fopen()");
+						exit(1);
+					}
+
+					n = fread(buffer, 1, BUFFER_SIZE, fp);
+					buffer[n] = '\0';
+
+					//verifies user's credentials
+					if(strcmp(buffer, arg3) == 0) {
+						bool ok = true;
+
+						//reads all files in user's directory
+						while((dir = readdir(d)) != NULL) {
+							sprintf(buffer, "%s/%s", dirname, dir->d_name);
+
+							if(remove(buffer) != 0) {
+								ok = false;
+							}
+						}
+
+						if(rmdir(dirname) != 0) {
+							perror("rmdir()");
+							exit(1);
+						}
+						
+
+						if(ok){
+							n = sendto(asfd, "RUN OK\n", 7, 0, (struct sockaddr*)&asaddr, asaddrlen);
+
+							if(n < 0) {
+								perror("sendto()");
+								exit(1);
+							}
+
+							if(verbose) {
+								puts("RUN OK\n");
+							}
+						}
+
+					}
+					//wrong pass
+					else{
+						sendto(asfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+						if(n < 0) {
+							perror("sendto()");
+							exit(1);
+						}
+
+						if(verbose) {
+							puts("RUN NOK\n");
+						}
+
+					}
+				}
+			}
+			else{
+				n = sendto(asfd, "RUN ERR\n", 8, 0, (struct sockaddr*)&asaddr, asaddrlen);
+
+				if(n < 0) {
+					perror("sendto()");
+					exit(1);
+				}
+
+				if(verbose) {
+					puts("RUN ERR\n");
+				}
+
+			}
 		}
 		else {
 			// error
