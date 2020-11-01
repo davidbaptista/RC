@@ -167,6 +167,7 @@ int main(int argc, char *argv[]) {
 					while(*c) {
 						if(isdigit(*c++) == 0) {
 							valid = false;
+							break;
 						}
 					}
 
@@ -174,6 +175,7 @@ int main(int argc, char *argv[]) {
 					while(*c) {
 						if(isalnum(*c++) == 0) {
 							valid = false;
+							break;
 						}
 					}
 
@@ -204,6 +206,7 @@ int main(int argc, char *argv[]) {
 
 						fp = fopen(filename, "r");
 
+						//first time user registration
 						if(fp == NULL) {
 							fp = fopen(filename, "w");
 
@@ -233,10 +236,12 @@ int main(int argc, char *argv[]) {
 
 							fclose(fp);
 						}
+						//user already registrated
 						else {
 							n = fread(buffer, 1, BUFFER_SIZE, fp);
 							buffer[n] = '\0';
 
+							//verifies user's credentials
 							if(strcmp(buffer, arg3) == 0) {
 								n = sendto(asfd, "RRG OK\n", 7, 0, (struct sockaddr*)&asaddr, asaddrlen);
 
