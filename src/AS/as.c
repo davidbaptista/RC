@@ -146,7 +146,6 @@ int main(int argc, char *argv[]) {
 	char buffer[BUFFER_SIZE];
 	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
 	int i;
-	int VC;
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
@@ -523,6 +522,8 @@ int main(int argc, char *argv[]) {
 			}
 			else if(pid == 0) {
 				close(astcpfd);
+
+				int VC;
 
 				while(true) {
 					readMessage(newfd, buffer);
