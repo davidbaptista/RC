@@ -523,15 +523,25 @@ int main(int argc, char *argv[]) {
 			else if(pid == 0) {
 				close(astcpfd);
 
+				char RID[5];
+				char UID[6];
+				char Fop[2];
+				char FName[25];
 				int VC;
+				int TID;
+				int potentialVC;
 
 				while(true) {
 					readMessage(newfd, buffer);
 
 					sscanf(buffer, "%s ", arg1);
-
+					
 					if(strcmp(arg1, "LOG") == 0) {
 						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
+
+						if(verbose) {
+							puts(buffer);
+						}
 
 						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
 							writeMessage(newfd, "RLO ERR\n", 8);
@@ -546,7 +556,6 @@ int main(int argc, char *argv[]) {
 						if(!d) {
 							writeMessage(newfd, "RLO ERR\n", 8);
 							close(newfd);
-							exit(1);
 						}
 
 						sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
@@ -585,6 +594,7 @@ int main(int argc, char *argv[]) {
 							}
 
 							sprintf(filename, "%s/%s_login.txt", dirname, arg2);
+							strcpy(UID, arg2);
 
 							if((fp = fopen(filename, "w")) == NULL) {
 								perror("fopen()");
@@ -595,6 +605,7 @@ int main(int argc, char *argv[]) {
 								perror("fclose()");
 								exit(1);
 							}
+
 							writeMessage(newfd, "RLO OK\n", 7);
 						}
 						else {
@@ -611,17 +622,14 @@ int main(int argc, char *argv[]) {
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
 							writeMessage(newfd, "RRQ ERR\n", 8);
-							exit(0);
 						}
 
 						if(!userExists(arg1)) {
 							writeMessage(newfd, "RRQ EUSER\n", 10);
-							exit(0);		
 						}
 
-						if(!userIsLoggedIn(arg1)) {
+						if(userIsLoggedIn(arg1) != true || strcmp(UID, arg1) != 0) {
 							writeMessage(newfd, "RRQ ELOG\n", 9);
-							exit(0);
 						}
 
 						if(strcmp(arg3, "X") == 0 || strcmp(arg3, "L") == 0 || strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) {
@@ -633,7 +641,6 @@ int main(int argc, char *argv[]) {
 								}
 								else {
 									writeMessage(newfd, "RRQ ERR\n", 8);
-									exit(0);
 								}
 							}
 							else if((strcmp(arg3, "L") == 0 || strcmp(arg3, "X") == 0) && ret == 3) {
@@ -641,7 +648,6 @@ int main(int argc, char *argv[]) {
 							}
 							else {
 								writeMessage(newfd, "RRQ ERR\n", 8);
-								exit(0);
 							}
 
 							sprintf(filename, "AS/USERS/%s/%s_reg.txt", arg1, arg1);
@@ -664,13 +670,18 @@ int main(int argc, char *argv[]) {
 							}
 
 							VC = rand() % 10000;
+							strcpy(RID, arg2);
 
 							if(hasFname) {
 								sprintf(buffer, "VLC %s %04d %s %s\n", arg1, VC, arg3, arg4);
+								strcpy(FName, arg4);
 							}
 							else {
 								sprintf(buffer, "VLC %s %04d %s\n", arg1, VC, arg3);
 							}
+
+							strcpy(Fop, arg3);
+
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
 							if(n == -1) {
@@ -686,16 +697,60 @@ int main(int argc, char *argv[]) {
 							}
 							else {
 								writeMessage(newfd, "RRQ EUSER\n", 10);
-								exit(0);
 							}
 						}
 						else {
 							writeMessage(newfd, "RRQ EFOP\n", 9);
-							exit(0);
 						}
 					}
 					else if(strcmp(arg1, "AUT") == 0) {
+						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3);
 
+						if(verbose) {
+							puts(buffer);
+						}
+
+						potentialVC = strtol(arg3, NULL, 10);
+
+						if(ret == 3 && strlen(arg1) == 5 && strlen(arg2) == 4) {
+							if(userExists(arg1) && userIsLoggedIn(arg1) && strcmp(arg1, UID) == 0 && strcmp(arg2, RID) == 0 && potentialVC == VC) {
+								TID = rand() % 10000;
+
+								sprintf(filename, "AS/USERS/%s/%s_tid.txt", UID, UID);
+
+								puts(filename);
+
+								fp = fopen(filename, "w");
+
+								if(fp == NULL) {
+									perror("fopen()");
+									exit(1);
+								}
+
+								if(strcmp(Fop, "L") == 0 || strcmp(Fop, "X") == 0) {
+									sprintf(buffer, "%04d %s", TID, Fop);
+								}
+								else {
+									sprintf(buffer, "%04d %s %s", TID, Fop, FName);
+								}
+								fwrite(buffer, strlen(buffer), 1, fp);
+
+								if(fclose(fp) != 0) {
+									perror("fclose()");
+									exit(1);
+								}
+
+								sprintf(buffer, "RAU %04d\n", TID);
+
+								writeMessage(newfd, buffer, strlen(buffer));
+							}
+							else {
+								writeMessage(newfd, "RAU 0\n", 6);
+							}
+						}
+						else {
+							writeMessage(newfd, "RAU 0\n", 6);
+						}
 					}
 					else if(strcmp(arg1, "EXIT") == 0) {
 						sscanf(buffer, "EXIT %s", arg2);

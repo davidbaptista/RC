@@ -131,6 +131,7 @@ int main(int argc, char *argv[]) {
 	char Fname[25];
 	char TID[5];
 	char Fop;
+	int ret;
 
 	parseArgs(argc, argv);
 
@@ -234,9 +235,10 @@ int main(int argc, char *argv[]) {
 			writeMessage(asfd, message, strlen(message));
 
 			readMessage(asfd, message);
-			sscanf(message, "%s %s", arg1, arg2);
+			ret = sscanf(message, "%s %s", arg1, arg2);
+			puts(message);
 
-			if(strcmp(arg2, "0") != 0){
+			if(ret == 2 && strcmp(arg2, "0") != 0){
 				strcpy(TID, arg2);
 				printf("Authenticated! (TID=%s)\n", TID);		
 			}
