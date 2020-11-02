@@ -95,6 +95,40 @@ long readMessage(int fd, char *msg) {
 	return ntotal;
 }
 
+bool userIsLoggedIn(char* UID){
+	FILE *fp;
+	char filename[32];
+
+	sprintf(filename, "AS/USERS/%s/%s_login.txt", UID, UID);
+	if((fp = fopen(filename, "r")) == NULL){
+		return false;
+	}
+
+	fclose(fp);
+
+	sprintf(filename, "AS/USERS/%s/%s_reg.txt", UID, UID);
+	if((fp = fopen(filename, "r")) == NULL){
+		return false;
+	}
+
+	fclose(fp);
+
+	return true;
+}
+
+bool userExists(char* UID){
+	DIR *d;
+	char dirname[16];
+	sprintf(dirname, "AS/USERS/%s", UID);
+
+	d = opendir(dirname);
+
+	if(!d) {
+		return false;
+	}
+	return true;
+}
+
 int main(int argc, char *argv[]) {
 	DIR *d;
 	FILE *fp;
@@ -110,8 +144,9 @@ int main(int argc, char *argv[]) {
 	char dirname[16];
 	char filename[32];
 	char buffer[BUFFER_SIZE];
-	char arg1[4], arg2[6], arg3[16], arg4[16], arg5[16];
+	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
 	int i;
+	int VC;
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
@@ -489,161 +524,187 @@ int main(int argc, char *argv[]) {
 			else if(pid == 0) {
 				close(astcpfd);
 
-				readMessage(newfd, buffer);
+				while(true) {
+					readMessage(newfd, buffer);
 
-				sscanf(buffer, "%s ", arg1);
+					sscanf(buffer, "%s ", arg1);
 
-				if(strcmp(arg1, "LOG") == 0) {
-					ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
+					if(strcmp(arg1, "LOG") == 0) {
+						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
 
-					if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
-						writeMessage(newfd, "RLO ERR\n", 8);
-						close(newfd);
-						exit(1);
-					}
+						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
+							writeMessage(newfd, "RLO ERR\n", 8);
+							close(newfd);
+							exit(1);
+						}
 
-					sprintf(dirname, "AS/USERS/%s", arg2);
+						sprintf(dirname, "AS/USERS/%s", arg2);
 
-					d = opendir(dirname);
+						d = opendir(dirname);
 
-					if(!d) {
-						writeMessage(newfd, "RLO ERR\n", 8);
-						close(newfd);
-						exit(1);
-					}
+						if(!d) {
+							writeMessage(newfd, "RLO ERR\n", 8);
+							close(newfd);
+							exit(1);
+						}
 
-					sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
+						sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
 
-					fp = fopen(filename, "r");
+						fp = fopen(filename, "r");
 
-					if(fp == NULL) {
-						writeMessage(newfd, "RLO ERR\n", 8);
-						close(newfd);
-						exit(1);
-					}
+						if(fp == NULL) {
+							writeMessage(newfd, "RLO ERR\n", 8);
+							close(newfd);
+							exit(1);
+						}
 
-					if(fclose(fp) != 0) {
-						perror("fclose()");
-						close(newfd);
-						exit(1);
-					}
-
-					sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
-
-					fp = fopen(filename, "r");
-
-					if(fp == NULL) {
-						writeMessage(newfd, "RLO ERR\n", 8);
-						close(newfd);
-						exit(1);
-					}
-
-					n = fread(buffer, 1, BUFFER_SIZE, fp);
-					buffer[n] = '\0';
-
-					if(strcmp(buffer, arg3) == 0) {
-						if(fclose(fp) == NULL) {
+						if(fclose(fp) != 0) {
 							perror("fclose()");
+							close(newfd);
 							exit(1);
 						}
-						sprintf(filename, "%s/%s_login.txt", dirname, arg2);
-						if((fp = fopen(filename, "w")) == NULL) {
-							perror("fopen()");
-							exit(1);
-						}
-						if(fclose(fp) == NULL) {
-							perror("fclose()");
-							exit(1);
-						}
-						writeMessage(newfd, "RLO OK\n", 7);
-					}
-					else {
-						writeMessage(newfd, "RLO NOK\n", 8);
-					}
 
-					fclose(fp);
-				}
-				else if(strcmp(arg1, "REQ") == 0) {
-					ret = sscanf(buffer, "REQ %s %s %s %s\n", arg1, arg2, arg3, arg4);
+						sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
 
+						fp = fopen(filename, "r");
 
-					if(strlen(arg1) != 5 || strlen(arg2) != 4){
-						writeMessage(newfd, "RRQ ERR\n", 8);
-						exit(0);
-					}
-
-					if(!userExists(arg1)) {
-						writeMessage(newfd, "RRQ EUSER\n", 10);
-						exit(0);		
-					}
-
-					if(!userIsLoggedIn(arg1)){
-						writeMessage(newfd, "RRQ ELOG\n", 9);
-						exit(0);
-					}
-
-					if(strcmp(arg3, "X") == 0 || !strcmp(arg3, "U") == 0 || strcmp(arg3, "R") == 0 || !strcmp(arg3, "U") == 0 || !strcmp(arg3, "D") == 0){
-
-						char message[BUFFER_SIZE];
-						if((strcmp(arg3, "R") == 0 || !strcmp(arg3, "U") == 0 || !strcmp(arg3, "D") == 0) && ret == 4){
-							if(strlen(arg4) <= 24){
-								sprintf(message, "VLC %s %04d %s %s", arg1, VC, arg3, arg4);
-							}
-							else {
-								writeMessage(newfd, "RRQ ERR\n", 8);
-								exit(0);
-							}
-						}
-						else {
-							sprintf(message, "VLC %s %04d %s", arg1, VC, arg3);
-						}
-
-						sprintf(filename, "AS/USERS/%s/%s_reg.txt", arg1, arg1);
-							
-						if((fp = fopen(filename, "r")) === NULL){
-							perror("fopen()");
+						if(fp == NULL) {
+							writeMessage(newfd, "RLO ERR\n", 8);
+							close(newfd);
 							exit(1);
 						}
 
 						n = fread(buffer, 1, BUFFER_SIZE, fp);
 						buffer[n] = '\0';
 
-						char pdIP[16];
-						char pdPort[6];
-						sscanf(buffer, "%s %s", pdIP, pdPort);
+						if(strcmp(buffer, arg3) == 0) {
+							if(fclose(fp) != 0) {
+								perror("fclose()");
+								exit(1);
+							}
 
-						if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
-							perror("getaddrinfo()");
-							exit(1);
-						}
+							sprintf(filename, "%s/%s_login.txt", dirname, arg2);
 
-						int VC = rand() % 10000;
+							if((fp = fopen(filename, "w")) == NULL) {
+								perror("fopen()");
+								exit(1);
+							}
 
-						n = sendto(pdfd, message, strlen(message), 0, pdres->ai_addr, pdres->ai_addrlen);
-						if(n == -1) {
-							exit(1);
-						}
-
-						n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
-						buffer[n]= '\0';
-
-						sscanf(buffer, "RVC %s %s", arg1, arg2);
-						if(strcmp(arg2, "OK") == 0){
-							writeMessage(newfd, "RRQ OK\n", 7);
+							if(fclose(fp) != 0) {
+								perror("fclose()");
+								exit(1);
+							}
+							writeMessage(newfd, "RLO OK\n", 7);
 						}
 						else {
-							writeMessage(newfd, "RRQ EUSER\n", 10);
+							fclose(fp);
+							writeMessage(newfd, "RLO NOK\n", 8);
 						}
 					}
-					else {
-						writeMessage(newfd, "RRQ EFOP\n", 9);
-						exit(0);
+					else if(strcmp(arg1, "REQ") == 0) {
+						ret = sscanf(buffer, "REQ %s %s %s %s", arg1, arg2, arg3, arg4);
+
+						if(verbose) {
+							puts(buffer);
+						}
+
+						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
+							writeMessage(newfd, "RRQ ERR\n", 8);
+							exit(0);
+						}
+
+						if(!userExists(arg1)) {
+							writeMessage(newfd, "RRQ EUSER\n", 10);
+							exit(0);		
+						}
+
+						if(!userIsLoggedIn(arg1)) {
+							writeMessage(newfd, "RRQ ELOG\n", 9);
+							exit(0);
+						}
+
+						if(strcmp(arg3, "X") == 0 || strcmp(arg3, "L") == 0 || strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) {
+							bool hasFname = false;
+
+							if((strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) && ret == 4) {
+								if(strlen(arg4) <= 24) {
+									hasFname = true;
+								}
+								else {
+									writeMessage(newfd, "RRQ ERR\n", 8);
+									exit(0);
+								}
+							}
+							else if((strcmp(arg3, "L") == 0 || strcmp(arg3, "X") == 0) && ret == 3) {
+								hasFname = false;
+							}
+							else {
+								writeMessage(newfd, "RRQ ERR\n", 8);
+								exit(0);
+							}
+
+							sprintf(filename, "AS/USERS/%s/%s_reg.txt", arg1, arg1);
+								
+							if((fp = fopen(filename, "r")) == NULL){
+								perror("fopen()");
+								exit(1);
+							}
+
+							n = fread(buffer, 1, BUFFER_SIZE, fp);
+							buffer[n] = '\0';
+
+							char pdIP[16];
+							char pdPort[6];
+							sscanf(buffer, "%s %s", pdIP, pdPort);
+
+							if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
+								perror("getaddrinfo()");
+								exit(1);
+							}
+
+							VC = rand() % 10000;
+
+							if(hasFname) {
+								sprintf(buffer, "VLC %s %04d %s %s\n", arg1, VC, arg3, arg4);
+							}
+							else {
+								sprintf(buffer, "VLC %s %04d %s\n", arg1, VC, arg3);
+							}
+
+							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
+							if(n == -1) {
+								exit(1);
+							}
+
+							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
+							buffer[n]= '\0';
+
+							sscanf(buffer, "RVC %s %s", arg1, arg2);
+							if(strcmp(arg2, "OK") == 0){
+								writeMessage(newfd, "RRQ OK\n", 7);
+							}
+							else {
+								writeMessage(newfd, "RRQ EUSER\n", 10);
+								exit(0);
+							}
+						}
+						else {
+							writeMessage(newfd, "RRQ EFOP\n", 9);
+							exit(0);
+						}
+					}
+					else if(strcmp(arg1, "AUT") == 0) {
+
+					}
+					else if(strcmp(arg1, "EXIT") == 0) {
+						sscanf(buffer, "EXIT %s", arg2);
+						writeMessage(newfd, "EXIT\n", 5);
+						sprintf(filename, "AS/USERS/%s/%s_login.txt", arg2, arg2);
+						remove(filename);
+
+						break;
 					}
 				}
-				else if(strcmp(arg1, "AUT") == 0) {
-
-				}
-
 
 				close(newfd);
 				exit(0);
@@ -662,34 +723,4 @@ int main(int argc, char *argv[]) {
 	freeaddrinfo(asudpres);
 	close(asudpfd);
 	exit(0);
-}
-
-bool userIsLoggedIn(char* UID){
-	char filename[32];
-
-	sprintf(filename, "AS/USERS/%s/%s_login.txt", UID, UID);
-	if(fopen(filename, "r") == NULL){
-		return false;
-	}
-	fclose(filename);
-
-	sprintf(filename, "AS/USERS/%s/%s_reg.txt", UID, UID);
-	if(fopen(filename, "r") == NULL){
-		return false;
-	}
-	fclose(filename);
-
-	return true;
-}
-
-bool userExists(char* UID){
-	char dirname[16];
-	sprintf(dirname, "AS/USERS/%s", UID);
-
-	d = opendir(dirname);
-
-	if(!d) {
-		return false;
-	}
-	return true;
 }

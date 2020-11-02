@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
 			RID = rand() % 10000;
 
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "L") == 0 || strcmp(arg1, "D") == 0 || strcmp(arg1, "X") == 0) {
-				if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0){
+				if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0) {
 					sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
 					writeMessage(asfd, message, strlen(message));
 				}
@@ -502,11 +502,12 @@ int main(int argc, char *argv[]) {
 				puts(TID_MESSAGE);
 			}else{
 				puts(ERR_MESSAGE);
-			}
-
-			
+			}	
 		}
 		else if(strcmp(command, "exit") == 0) {
+			sprintf(message, "EXIT %s\n", UID);
+			writeMessage(asfd, message, strlen(message));
+			readMessage(asfd, message);
 	
 			freeaddrinfo(asres);
 			close(asfd);
