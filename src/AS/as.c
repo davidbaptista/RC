@@ -98,7 +98,7 @@ long readMessage(int fd, char *msg) {
 
 bool userIsLoggedIn(char* UID){
 	FILE *fp;
-	char filename[32];
+	char filename[64];
 
 	sprintf(filename, "AS/USERS/%s/%s_login.txt", UID, UID);
 	if((fp = fopen(filename, "r")) == NULL){
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     struct addrinfo asudphints, *asudpres, pdhints, *pdres, astcphints, *astcpres;
 	char *c;
 	char dirname[16];
-	char filename[32];
+	char filename[64];
 	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
 	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
