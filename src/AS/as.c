@@ -532,6 +532,32 @@ int main(int argc, char *argv[]) {
 							perror("remove()");
 							exit(1);
 						}
+
+						if(aux[0] == 'X') {
+							bool ok = true;
+
+							sprintf(dirname, "AS/USERS/%s", arg1);
+							d = opendir(dirname);
+
+							while((dir = readdir(d)) != NULL) {
+								sprintf(buffer, "%s/%s", dirname, dir->d_name);
+
+								if(remove(buffer) != 0) {
+									ok = false
+								}
+							}
+
+							if(rmdir(dirname) != 0) {
+								perror("rmdir()");
+								exit(1);
+							}
+
+							if(!ok) {
+								perror("remove()");
+								exit(1);
+							}
+
+						}
 					}
 					else {
 						sprintf(buffer, "CNF %s %s E\n", arg1, arg2);
