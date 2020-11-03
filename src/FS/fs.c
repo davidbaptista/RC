@@ -117,7 +117,7 @@ long readMessage(int fd, char *msg, long int msgSize) {
 int main(int argc, char *argv[]) {
     int asfd, fsfd, newfd;
 	char UID[UID_SIZE];
-	char TID[TID_SIZE];
+	char TID[TID_SIZE] = "0000";
 	char buffer[BUFFER_SIZE];
 	char command[COMMAND_SIZE];
 	struct sigaction act;
@@ -506,9 +506,11 @@ int main(int argc, char *argv[]) {
 							break;
 						case 'E':
 							sprintf(buffer, "%s INV\n", command);
+							writeMessage(newfd, buffer, strlen(buffer));
 							break;
 						default:
 							sprintf(buffer, "%s ERR\n", command);
+							writeMessage(newfd, buffer, strlen(buffer));
 							break;
 					}
 					

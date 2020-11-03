@@ -24,6 +24,7 @@
 #define DEFAULT_AS_PORT "58002"
 
 #define BUFFER_SIZE 512
+#define AUX_SIZE 64
 
 bool verbose = false;
 
@@ -143,6 +144,7 @@ int main(int argc, char *argv[]) {
 	char *c;
 	char dirname[16];
 	char filename[32];
+	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
 	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
 	int i;
@@ -398,7 +400,7 @@ int main(int argc, char *argv[]) {
 			else if(strcmp(arg1, "UNR") == 0) {
 				n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
 
-				if(n==3){
+				if(n==3) {
 					sprintf(dirname, "AS/USERS/%s", arg2);
 
 					d = opendir(dirname);
@@ -416,7 +418,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 					//user exists
-					else{
+					else {
 						sprintf(filename, "%s/%s_pass.txt", dirname, arg2);
 
 						fp = fopen(filename, "r");
@@ -488,6 +490,62 @@ int main(int argc, char *argv[]) {
 
 					if(verbose) {
 						puts("RUN ERR\n");
+					}
+				}
+			}
+			else if(strcmp(arg1, "VLD") == 0) {
+				n = sscanf(buffer, "VLD %s %s", arg1, arg2);
+
+				if(n == 2 && strlen(arg1) == 5 && strlen(arg2) == 4 && userExists(arg1) && userIsLoggedIn(arg1)) {
+					sprintf(filename, "AS/USERS/%s/%s_tid.txt", arg1, arg1);
+
+					fp = fopen(filename, "r");
+
+					if(fp == NULL) {
+						sprintf(buffer, "CNF %s %s E\n", arg1, arg2);
+
+						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+						if(verbose) {
+							puts(buffer);
+						}
+
+						if(n < 0) {
+							perror("sendto()");
+							exit(1);
+						}
+					}
+
+					n = fread(buffer, 1, 5, fp);
+
+					buffer[n - 1] = '\0';
+
+					if(strcmp(buffer, arg2) == 0) {
+						n = fread(aux, 1, AUX_SIZE, fp);
+						aux[n] = '\0';
+
+						sprintf(buffer, "CNF %s %s %s\n", arg1, arg2, aux);
+
+						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+
+						if(remove(filename) != 0) {
+							perror("remove()");
+							exit(1);
+						}
+					}
+					else {
+						sprintf(buffer, "CNF %s %s E\n", arg1, arg2);
+
+						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+					}
+
+					if(n < 0) {
+						perror("sendto()");
+						exit(1);
+					}
+
+					if(verbose) {
+						puts(buffer);
 					}
 				}
 			}
@@ -718,8 +776,6 @@ int main(int argc, char *argv[]) {
 
 								sprintf(filename, "AS/USERS/%s/%s_tid.txt", UID, UID);
 
-								puts(filename);
-
 								fp = fopen(filename, "w");
 
 								if(fp == NULL) {
@@ -733,6 +789,7 @@ int main(int argc, char *argv[]) {
 								else {
 									sprintf(buffer, "%04d %s %s", TID, Fop, FName);
 								}
+
 								fwrite(buffer, strlen(buffer), 1, fp);
 
 								if(fclose(fp) != 0) {
