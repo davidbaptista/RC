@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     struct addrinfo asudphints, *asudpres, pdhints, *pdres, astcphints, *astcpres;
 	char *c;
 	char dirname[64];
-	char filename[64];
+	char filename[128];
 	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
 	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
