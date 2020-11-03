@@ -146,9 +146,9 @@ int main(int argc, char *argv[]) {
 
             c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
-            if(c == 1 && strcmp(command, "exit") == 0) {
+            if(c == 1 && strlen(UID) == 5 && strlen(pass) == 8 && strcmp(command, "exit") == 0) {
                 if(reg) {
-                    sprintf(msg, "UNR %s %s\n", arg1, arg2);
+                    sprintf(msg, "UNR %s %s\n", UID, pass);
 
                     n = sendto(asfd, msg, strlen(msg), 0, asres->ai_addr, asres->ai_addrlen);
                     if(n == -1) {
@@ -160,6 +160,7 @@ int main(int argc, char *argv[]) {
                     buffer[n] = '\0';
 
                     if(n == -1) {
+						perror("recvfrom()");
                         exit(1);
                     }
 
