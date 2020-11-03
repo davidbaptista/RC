@@ -543,7 +543,7 @@ int main(int argc, char *argv[]) {
 								sprintf(buffer, "%s/%s", dirname, dir->d_name);
 
 								if(remove(buffer) != 0) {
-									ok = false
+									ok = false;
 								}
 							}
 
