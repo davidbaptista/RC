@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in asudpaddr, pdaddr, astcpaddr;
     struct addrinfo asudphints, *asudpres, pdhints, *pdres, astcphints, *astcpres;
 	char *c;
-	char dirname[16];
+	char dirname[64];
 	char filename[64];
 	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
