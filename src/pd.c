@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
                 exit(1);
             }
         }
-        if(FD_ISSET(0, &fds)){
+        if(FD_ISSET(0, &fds)) { 
             fgets(line, sizeof(line), stdin);
 
             c = sscanf(line, "%s %s %s", command, arg1, arg2);
