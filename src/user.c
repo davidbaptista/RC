@@ -189,12 +189,16 @@ int main(int argc, char *argv[]) {
 			RID = rand() % 10000;
 
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "L") == 0 || strcmp(arg1, "D") == 0 || strcmp(arg1, "X") == 0) {
-				if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0) {
+				if((strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0) && c == 3) {
 					sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
 					writeMessage(asfd, message, strlen(message));
 				}
-				else {
+				else if(c == 2){
 					sprintf(message, "REQ %s %04d %s\n", UID, RID, arg1);
+					writeMessage(asfd, message, strlen(message));
+				}
+				else {
+					sprintf(message, ERR_MESSAGE, UID, RID, arg1);
 					writeMessage(asfd, message, strlen(message));
 				}
 
@@ -202,7 +206,7 @@ int main(int argc, char *argv[]) {
 
 				if(strcmp(message, "RRQ OK\n") == 0) {
 					Fop = arg1[0];
-					if(Fop == 'R' || Fop == 'U' || Fop == 'D') {
+					if((Fop == 'R' || Fop == 'U' || Fop == 'D') && c == 3) {
 						strcpy(Fname, arg2);
 					}
 				}
@@ -405,7 +409,7 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			sprintf(message, "UPL %s %s %s ", UID, TID, Fname);
+			sprintf(message, "UPL %s %s %s\n", UID, TID, Fname);
 
 			FILE *fp = fopen(Fname, "rb");
 
