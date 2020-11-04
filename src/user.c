@@ -181,7 +181,6 @@ int main(int argc, char *argv[]) {
 				puts("You are now logged in");
 			}
 			else {
-				printf("%s a\n", message);
 				puts("Login failed!");
 			}
 		}
