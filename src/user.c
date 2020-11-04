@@ -197,8 +197,7 @@ int main(int argc, char *argv[]) {
 					writeMessage(asfd, message, strlen(message));
 				}
 				else {
-					sprintf(message, ERR_MESSAGE, UID, RID, arg1);
-					writeMessage(asfd, message, strlen(message));
+					writeMessage(asfd, ERR_MESSAGE, strlen(ERR_MESSAGE));
 				}
 
 				readMessage(asfd, message);

@@ -228,14 +228,14 @@ int main(int argc, char *argv[]) {
 					}
 
 					if(n < 0) {
-						puts("sendto error");
+						perror("sendto()");
 						exit(1);
 					}
 
 					n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, &asaddrlen);
 
 					if(n < 0) {
-						puts("recvfrom error");
+						perror("recvfrom()");						
 						exit(1);
 					}
 
@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
 					ssize_t nbytes;
 					ssize_t nread;
 
-					sprintf(dirname, "USERS/%s/", UID);
+					sprintf(dirname, "FS/USERS/%s/", UID);
 
 					switch(Fop) {
 						case 'L':
