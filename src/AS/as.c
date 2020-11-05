@@ -111,11 +111,11 @@ bool userIsLoggedIn(char* UID){
 	}
 
 	sprintf(filename, "AS/USERS/%s/%s_reg.txt", UID, UID);
-	if((fp = fopen(filename, "r")) == NULL){
+	if((fp = fopen(filename, "r")) == NULL) {
 		return false;
 	}
 
-	if(fclose(fp) != 0) {
+	if(fclose(fp) != 0) { 
 		perror("fclose()");
 		exit(1);
 	}
@@ -125,7 +125,7 @@ bool userIsLoggedIn(char* UID){
 
 bool userExists(char* UID){
 	DIR *d;
-	char dirname[16];
+	char dirname[64];
 	sprintf(dirname, "AS/USERS/%s", UID);
 
 	d = opendir(dirname);
@@ -158,7 +158,6 @@ int main(int argc, char *argv[]) {
 	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
 	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
-	int i;
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
@@ -526,7 +525,7 @@ int main(int argc, char *argv[]) {
 			else if(strcmp(arg1, "VLD") == 0) {
 				n = sscanf(buffer, "VLD %s %s", arg1, arg2);
 
-				if(n == 2 && strlen(arg1) == 5 && strlen(arg2) == 4 && userExists(arg1) && userIsLoggedIn(arg1)) {
+				if(n == 2 && strlen(arg1) == 5 && strlen(arg2) == 4 /* && userExists(arg1) && userIsLoggedIn(arg1)*/) {
 					sprintf(filename, "AS/USERS/%s/%s_tid.txt", arg1, arg1);
 
 					fp = fopen(filename, "r");
@@ -558,6 +557,7 @@ int main(int argc, char *argv[]) {
 
 						if(fclose(fp) != 0) {
 							perror("fclose()");
+							exit(1);
 						}
 
 						sprintf(buffer, "CNF %s %s %s\n", arg1, arg2, aux);
@@ -576,7 +576,7 @@ int main(int argc, char *argv[]) {
 							sprintf(dirname, "AS/USERS/%s", arg1);
 							d = opendir(dirname);
 
-							if(!d) {
+							if(d == NULL) {
 								perror("opendir()");
 								exit(1);
 							}
@@ -592,14 +592,15 @@ int main(int argc, char *argv[]) {
 								}
 							}
 
-							if(rmdir(dirname) != 0) {
-								perror("rmdir()");
-								exit(1);
-							}
-
 							if(!ok) {
 								perror("remove()");
 								exit(1);
+							} 
+							else {
+								if(rmdir(dirname) != 0) {
+									perror("rmdir()");
+									exit(1);
+								}
 							}
 						}
 					}
@@ -801,8 +802,8 @@ int main(int argc, char *argv[]) {
 							n = fread(buffer, 1, BUFFER_SIZE, fp);
 							buffer[n] = '\0';
 
-							char pdIP[16];
-							char pdPort[6];
+							char pdIP[32];
+							char pdPort[8];
 							sscanf(buffer, "%s %s", pdIP, pdPort);
 
 							if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
@@ -895,7 +896,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 					else if(strcmp(arg1, "EXIT") == 0) {
-						sscanf(buffer, fopen"EXIT %s", arg2);
+						sscanf(buffer, "EXIT %s", arg2);
 						writeMessage(newfd, "EXIT\n", 5);
 						sprintf(filename, "AS/USERS/%s/%s_login.txt", arg2, arg2);
 						remove(filename);

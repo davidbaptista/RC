@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
 	char *ptr;
 	char fsize[16];
 	char FName[32];
-	char dirname[16];
+	char dirname[64];
 	char TID[TID_SIZE] = "0000";
 	char UID[UID_SIZE];
 	char aux[AUX_SIZE]; 			// used for building the list buffer
@@ -513,6 +513,7 @@ int main(int argc, char *argv[]) {
 						fclose(fp);
 
 						writeMessage(newfd, "RUP OK\n", 7);
+						printf("RUP OK\n");
 					}
 					else if(Fop == 'X') {
 						d = opendir(dirname);
@@ -531,17 +532,18 @@ int main(int argc, char *argv[]) {
 								}
 							}
 
-							if(rmdir(dirname) != 0) {
-								perror("rmdir()");
-								exit(1);
-							}
-
 							if(ok) {
+								if(rmdir(dirname) != 0) {
+									perror("rmdir()");
+									exit(1);
+								}
+
 								writeMessage(newfd, "RRM OK\n", (long) 7);
 								printf("RRM OK\n");
 							}
 							else {
 								writeMessage(newfd, "RRM ERR\n", (long) 8);
+								printf("RRM ERR\n");
 							}
 						}
 						else {
