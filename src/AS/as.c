@@ -525,7 +525,7 @@ int main(int argc, char *argv[]) {
 			else if(strcmp(arg1, "VLD") == 0) {
 				n = sscanf(buffer, "VLD %s %s", arg1, arg2);
 
-				if(n == 2 && strlen(arg1) == 5 && strlen(arg2) == 4 /* && userExists(arg1) && userIsLoggedIn(arg1)*/) {
+				if(n == 2 && strlen(arg1) == 5 && strlen(arg2) == 4  && userExists(arg1) && userIsLoggedIn(arg1)) {
 					sprintf(filename, "AS/USERS/%s/%s_tid.txt", arg1, arg1);
 
 					fp = fopen(filename, "r");
@@ -801,6 +801,11 @@ int main(int argc, char *argv[]) {
 
 							n = fread(buffer, 1, BUFFER_SIZE, fp);
 							buffer[n] = '\0';
+
+							if(fclose(fp) != 0) {
+								perror("fclose()");
+								exit(1);
+							}
 
 							char pdIP[32];
 							char pdPort[8];
