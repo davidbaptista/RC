@@ -116,8 +116,6 @@ long readMessage(int fd, char *msg, long int msgSize) {
 
 int main(int argc, char *argv[]) {
     int asfd, fsfd, newfd;
-	char UID[UID_SIZE];
-	char TID[TID_SIZE] = "0000";
 	char buffer[BUFFER_SIZE];
 	char command[COMMAND_SIZE];
 	struct sigaction act;
@@ -128,6 +126,24 @@ int main(int argc, char *argv[]) {
 	pid_t pid;
 	ssize_t n;
 	int ret;
+
+	// user specific
+	DIR *d;
+	FILE *fp;
+	ssize_t nread;
+	ssize_t nbytes;
+	struct dirent *dir;
+	char Fop;
+	char *ptr;
+	char fsize[16];
+	char FName[32];
+	char dirname[16];
+	char TID[TID_SIZE] = "0000";
+	char UID[UID_SIZE];
+	char aux[AUX_SIZE]; 			// used for building the list buffer
+	long size;
+	int i = 0;
+	bool dup = false;
 
     parseArgs(argc, argv);
 
@@ -194,10 +210,21 @@ int main(int argc, char *argv[]) {
 		else if(pid == 0) {
 			close(fsfd);
 
-			char Fop;
-			char FName[11];
-			while(readMessage(newfd, buffer, (long)14)) {
+			while(true) {
+				n = readMessage(newfd, buffer, BUFFER_SIZE);
+
+				if(n < 0) {
+					perror("read()");
+					exit(1);
+				}
+
+				buffer[n] = '\0';
+
 				sscanf(buffer, "%s %s %s", command, UID, TID);
+
+				if(verbose) {
+					printf(buffer);
+				}
 				
 				if(strlen(UID) == 5 && strlen(TID) == 4) {
 					if(strcmp(command, "LST") == 0) {
@@ -217,14 +244,14 @@ int main(int argc, char *argv[]) {
 					}
 					else {
 						writeMessage(newfd, "ERR\n", 4);
-						break;
+						exit(1);
 					}
 
 					sprintf(buffer, "VLD %s %s\n", UID, TID);
 					
 					n = sendto(asfd, buffer, strlen(buffer), 0, asres->ai_addr, asres->ai_addrlen);
 					if(verbose) {
-						puts(buffer);
+						printf(buffer);
 					}
 
 					if(n < 0) {
@@ -241,277 +268,262 @@ int main(int argc, char *argv[]) {
 
 					buffer[n] = '\0';
 
+					sscanf(buffer, "CNF %s %s %c %s", UID, TID, &Fop, FName);
+					
 					if(verbose) {
-						puts(buffer);
+						printf(buffer);
 					}
 
-					sscanf(buffer, "CNF %s %s %c %s", UID, TID, &Fop, FName);
+					sprintf(dirname, "FS/USERS/%s", UID);
 
-					DIR *d;
-					FILE *fp;
-					struct dirent *dir;
-					char aux[AUX_SIZE];
-					char dirname[13];
-					long size;
-					int dup = 0;
-					int i = 0;
-					char *ptr;
-					ssize_t nbytes;
-					ssize_t nread;
-
-					sprintf(dirname, "FS/USERS/%s/", UID);
-
-					switch(Fop) {
-						case 'L':
-							d = opendir(dirname);
-							
-							if(d) {
-								i = 0;
-								strcpy(aux, "");
-								while((dir = readdir(d)) != NULL) {
-									i++;
-									if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
-										i--;
-										continue;
-									}
-									sprintf(buffer, "%s/%s", dirname, dir->d_name);
-									fp = fopen(buffer, "rb"); // FIX LATER
-
-									if(fp == NULL) {
-										perror("fopen()");
-										exit(1);
-									}
-
-									if(fseek(fp, 0, SEEK_END) < 0) {
-										perror("fseek()");
-										exit(1);
-									}
-									
-									size = ftell(fp);
-
-									if(size < 0) {
-										perror("ftell()");
-										exit(1);
-									}
-									if(fseek(fp, 0, SEEK_SET) < 0) {
-										perror("fseek()");
-										exit(1);
-									}
-
-									if(fclose(fp) < 0) {
-										perror("fclose()");
-										exit(1);
-									}
-
-									if(strlen(dir->d_name) > 24) {
-										printf("Error: filename too big %s", dir->d_name);
-										exit(1);
-									}
-									sprintf(buffer, " %s %ld", dir->d_name, size);
-									strcat(aux, buffer);
+					if (Fop == 'L') {
+						d = opendir(dirname);
+						
+						if(d) {
+							i = 0;
+							strcpy(aux, "");
+							while((dir = readdir(d)) != NULL) {
+								i++;
+								if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+									i--;
+									continue;
 								}
-
-								if(i > 0) {
-									sprintf(buffer, "RLS %d%s\n", i, aux);
-								}
-								else {
-									sprintf(buffer, "RLS EOF\n");
-								}
-							}
-							else {
-								sprintf(buffer, "RLS EOF\n");
-							}
-							writeMessage(newfd, buffer, strlen(buffer));
-
-							if(verbose) {
-								puts(buffer);
-							}
-
-							break;
-						case 'R':
-							d = opendir(dirname);
-							fp = NULL;
-
-							if(d) {
-								sprintf(buffer, "%s/%s", dirname, FName);
-								fp = fopen(buffer, "rb");
+								sprintf(buffer, "%s/%s", dirname, dir->d_name);
+								fp = fopen(buffer, "rb"); // FIX LATER
 
 								if(fp == NULL) {
-									sprintf(buffer, "RRT EOF\n");
-									writeMessage(newfd, buffer, strlen(buffer));
-									break;
+									perror("fopen()");
+									exit(1);
 								}
 
 								if(fseek(fp, 0, SEEK_END) < 0) {
 									perror("fseek()");
 									exit(1);
 								}
-
+								
 								size = ftell(fp);
 
 								if(size < 0) {
 									perror("ftell()");
 									exit(1);
 								}
-
 								if(fseek(fp, 0, SEEK_SET) < 0) {
 									perror("fseek()");
 									exit(1);
 								}
 
-								sprintf(buffer, "RRT OK %ld ", size);
-
-								writeMessage(newfd, buffer, strlen(buffer));
-
-								nbytes = 0;
-			
-								while(nbytes < size) {
-									fread(buffer, 1, BUFFER_SIZE, fp);
-									nbytes += writeMessage(newfd, buffer, BUFFER_SIZE);
-									bzero(buffer, BUFFER_SIZE);
-								}
-
-								writeMessage(newfd, "\n", 1);
-
 								if(fclose(fp) < 0) {
 									perror("fclose()");
 									exit(1);
 								}
+
+								if(strlen(dir->d_name) > 24) {
+									printf("Error: filename too big %s", dir->d_name);
+									exit(1);
+								}
+								sprintf(buffer, " %s %ld", dir->d_name, size);
+								strcat(aux, buffer);
+							}
+
+							if(i > 0) {
+								sprintf(buffer, "RLS %d%s\n", i, aux);
 							}
 							else {
-								sprintf(buffer, "RRT NOK\n");
-								writeMessage(newfd, buffer, strlen(buffer));
+								sprintf(buffer, "RLS EOF\n");
 							}
-							break;
-						case 'D':
-							d = opendir(dirname);
-							fp = NULL;
+						}
+						else {
+							sprintf(buffer, "RLS EOF\n");
+						}
+						writeMessage(newfd, buffer, strlen(buffer));
 
-							if(d) {
-								sprintf(buffer, "%s/%s", dirname, FName);
+						if(verbose) {
+							puts(buffer);
+						}
+					}
+					else if(Fop == 'R') {
+						d = opendir(dirname);
+						fp = NULL;
 
-								if(remove(buffer) == 0){
-									writeMessage(newfd, "RDL OK\n", (long) 7);
-								}
-								else{
-									writeMessage(newfd, "RDL EOF\n", (long) 8);
-								}
-							}
-							else{
-								writeMessage(newfd, "RDL NOK\n", (long) 8);
-							}
-							break;
-						case 'U':
-							i = 0; 
-							dup = 0;
-							d = opendir(dirname);
-
-							if(!d){
-								mkdir(dirname, 0777);
-								d = opendir(dirname);
-							}
-
-							while((dir = readdir(d)) != NULL) {
-								if(strcmp(dir->d_name, FName) == 0){
-									dup = 1;
-									break;
-								}
-								i++;
-							}
-
-							if(dup == 1) {
-								writeMessage(newfd, "RUP DUP\n", (long)8);
-								break;
-							}
-
-							if(i >= 15){
-								writeMessage(newfd, "RUP FULL\n", (long)9);
-								break;
-							}
-							
+						if(d) {
 							sprintf(buffer, "%s/%s", dirname, FName);
-
-							fp = fopen(buffer, "wb");
+							fp = fopen(buffer, "rb");
 
 							if(fp == NULL) {
-								perror("fopen()");
+								sprintf(buffer, "RRT EOF\n");
+								writeMessage(newfd, buffer, strlen(buffer));
+								break;
+							}
+
+							if(fseek(fp, 0, SEEK_END) < 0) {
+								perror("fseek()");
 								exit(1);
 							}
 
-							char fsize[11];
+							size = ftell(fp);
 
-							ptr = fsize;
-							nbytes = 0;
-
-							while(1) {
-								nread = read(newfd, ptr, 1);
-
-								if(nread == -1) {
-									exit(1);
-								}
-								else if(nread == 0) {
-									break;
-								}
-								nbytes += nread;
-
-								if(ptr[nread-1] == ' ') {
-									break;
-								}
-								ptr += nread;
+							if(size < 0) {
+								perror("ftell()");
+								exit(1);
 							}
 
-							fsize[nbytes] = '\0';
+							if(fseek(fp, 0, SEEK_SET) < 0) {
+								perror("fseek()");
+								exit(1);
+							}
 
-							size = strtol(fsize, NULL, 10);
+							sprintf(buffer, "RRT OK %ld ", size);
+
+							writeMessage(newfd, buffer, strlen(buffer));
+
 							nbytes = 0;
-
+		
 							while(nbytes < size) {
-								nread = read(newfd, buffer, BUFFER_SIZE);
-								nbytes += nread;
-
-								if(fwrite(buffer, 1, nread, fp) < 0) {
-									exit(1);
-								}
-
+								fread(buffer, 1, BUFFER_SIZE, fp);
+								nbytes += writeMessage(newfd, buffer, BUFFER_SIZE);
 								bzero(buffer, BUFFER_SIZE);
 							}
 
-							break;
-						case 'X':
+							writeMessage(newfd, "\n", 1);
+
+							if(fclose(fp) < 0) {
+								perror("fclose()");
+								exit(1);
+							}
+						}
+						else {
+							sprintf(buffer, "RRT NOK\n");
+							writeMessage(newfd, buffer, strlen(buffer));
+						}
+					}
+					else if(Fop == 'D') {
+						d = opendir(dirname);
+						fp = NULL;
+
+						if(d) {
+							sprintf(buffer, "%s/%s", dirname, FName);
+
+							if(remove(buffer) == 0){
+								writeMessage(newfd, "RDL OK\n", (long) 7);
+							}
+							else{
+								writeMessage(newfd, "RDL EOF\n", (long) 8);
+							}
+						}
+						else{
+							writeMessage(newfd, "RDL NOK\n", (long) 8);
+						}
+						break;
+					}
+					else if(Fop == 'U') {
+						i = 0; 
+						dup = false;
+						d = opendir(dirname);
+
+						if(!d){
+							mkdir(dirname, 0777);
 							d = opendir(dirname);
+						}
 
-							if(d) {
-								bool ok = true;
-								while((dir = readdir(d)) != NULL) {
-									sprintf(buffer, "%s/%s", dirname, dir->d_name);
-
-									if(remove(buffer) != 0) {
-										ok = false;
-									}
-								}
-
-								if(rmdir(dirname) != 0) {
-									perror("rmdir()");
-									exit(1);
-								}
-
-								if(ok) {
-									writeMessage(newfd, "REM OK\n", (long) 7);
-								}
-
+						while((dir = readdir(d)) != NULL) {
+							if(strcmp(dir->d_name, FName) == 0){
+								dup = true;
+								break;
 							}
-							else {
-								writeMessage(newfd, "RRM NOK\n", (long) 8);
+							i++;
+						}
+
+						if(dup) {
+							writeMessage(newfd, "RUP DUP\n", (long)8);
+							break;
+						}
+
+						if(i >= 15){
+							writeMessage(newfd, "RUP FULL\n", (long)9);
+							break;
+						}
+						
+						sprintf(buffer, "%s/%s", dirname, FName);
+
+						puts(buffer);
+
+						fp = fopen(buffer, "wb");
+
+						if(fp == NULL) {
+							perror("fopen()");
+							exit(1);
+						}
+
+						ptr = fsize;
+						nbytes = 0;
+
+						while(1) {
+							nread = read(newfd, ptr, 1);
+
+							if(nread == -1) {
+								exit(1);
 							}
-							break;
-						case 'E':
-							sprintf(buffer, "%s INV\n", command);
-							writeMessage(newfd, buffer, strlen(buffer));
-							break;
-						default:
-							sprintf(buffer, "%s ERR\n", command);
-							writeMessage(newfd, buffer, strlen(buffer));
-							break;
+							else if(nread == 0) {
+								break;
+							}
+							nbytes += nread;
+
+							if(ptr[nread-1] == ' ') {
+								break;
+							}
+							ptr += nread;
+						}
+
+						fsize[nbytes] = '\0';
+
+						size = strtol(fsize, NULL, 10);
+						nbytes = 0;
+
+						while(nbytes < size) {
+							nread = read(newfd, buffer, BUFFER_SIZE);
+							nbytes += nread;
+
+							if(fwrite(buffer, 1, nread, fp) < 0) {
+								exit(1);
+							}
+
+							bzero(buffer, BUFFER_SIZE);
+						}
+					}
+					else if(Fop == 'X') {
+						d = opendir(dirname);
+
+						if(d) {
+							bool ok = true;
+							while((dir = readdir(d)) != NULL) {
+								sprintf(buffer, "%s/%s", dirname, dir->d_name);
+
+								if(remove(buffer) != 0) {
+									ok = false;
+								}
+							}
+
+							if(rmdir(dirname) != 0) {
+								perror("rmdir()");
+								exit(1);
+							}
+
+							if(ok) {
+								writeMessage(newfd, "REM OK\n", (long) 7);
+							}
+
+						}
+						else {
+							writeMessage(newfd, "RRM NOK\n", (long) 8);
+						}
+					}
+					else if(Fop == 'E') {
+						sprintf(buffer, "%s INV\n", command);
+						writeMessage(newfd, buffer, strlen(buffer));
+					}
+					else {
+						sprintf(buffer, "%s ERR\n", command);
+						writeMessage(newfd, buffer, strlen(buffer));
 					}
 					
 					close(newfd);

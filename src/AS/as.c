@@ -616,7 +616,14 @@ int main(int argc, char *argv[]) {
 				int potentialVC;
 
 				while(true) {
-					readMessage(newfd, buffer);
+					n = readMessage(newfd, buffer);
+
+					buffer[n] = '\0';
+
+					if(n < 0) {
+						perror("read()");
+						exit(1);
+					}
 
 					sscanf(buffer, "%s ", arg1);
 					

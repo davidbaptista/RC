@@ -238,7 +238,6 @@ int main(int argc, char *argv[]) {
 
 			readMessage(asfd, message);
 			ret = sscanf(message, "%s %s", arg1, arg2);
-			puts(message);
 
 			if(ret == 2 && strcmp(arg2, "0") != 0){
 				strcpy(TID, arg2);
