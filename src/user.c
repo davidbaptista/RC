@@ -197,7 +197,8 @@ int main(int argc, char *argv[]) {
 					writeMessage(asfd, message, strlen(message));
 				}
 				else {
-					writeMessage(asfd, ERR_MESSAGE, strlen(ERR_MESSAGE));
+					puts(PROTOCOL_ERROR_MESSAGE);
+					continue;
 				}
 
 				readMessage(asfd, message);
@@ -371,6 +372,10 @@ int main(int argc, char *argv[]) {
 					nread = read(fsfd, message, MESSAGE_SIZE);
 					nbytes += nread;
 
+					if(nbytes >= size) {
+						nread -= (nbytes - size);
+					}
+
 					if(fwrite(message, 1, nread, fp) < 0) {
 						perror("fwrite()");
 						exit(1);
@@ -398,7 +403,6 @@ int main(int argc, char *argv[]) {
 
 			close(fsfd);
 		}
-
 		else if(strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 

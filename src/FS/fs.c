@@ -250,15 +250,16 @@ int main(int argc, char *argv[]) {
 					sprintf(buffer, "VLD %s %s\n", UID, TID);
 					
 					n = sendto(asfd, buffer, strlen(buffer), 0, asres->ai_addr, asres->ai_addrlen);
-					if(verbose) {
-						printf(buffer);
-					}
 
 					if(n < 0) {
 						perror("sendto()");
 						exit(1);
 					}
 
+					if(verbose) {
+						
+						printf(buffer);
+					}
 					n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, &asaddrlen);
 
 					if(n < 0) {
@@ -317,10 +318,6 @@ int main(int argc, char *argv[]) {
 									exit(1);
 								}
 
-								if(strlen(dir->d_name) > 24) {
-									printf("Error: filename too big %s", dir->d_name);
-									exit(1);
-								}
 								sprintf(buffer, " %s %ld", dir->d_name, size);
 								strcat(aux, buffer);
 							}
@@ -338,7 +335,7 @@ int main(int argc, char *argv[]) {
 						writeMessage(newfd, buffer, strlen(buffer));
 
 						if(verbose) {
-							puts(buffer);
+							printf(buffer);
 						}
 					}
 					else if(Fop == 'R') {
@@ -351,6 +348,9 @@ int main(int argc, char *argv[]) {
 
 							if(fp == NULL) {
 								sprintf(buffer, "RRT EOF\n");
+								if(verbose) {
+									printf(buffer);
+								}
 								writeMessage(newfd, buffer, strlen(buffer));
 								break;
 							}
@@ -376,11 +376,16 @@ int main(int argc, char *argv[]) {
 
 							writeMessage(newfd, buffer, strlen(buffer));
 
+							if(verbose) {
+								printf("Sending file %s to user\n", FName);
+							}
+
 							nbytes = 0;
+							nread = 0;
 		
 							while(nbytes < size) {
-								fread(buffer, 1, BUFFER_SIZE, fp);
-								nbytes += writeMessage(newfd, buffer, BUFFER_SIZE);
+								nread = fread(buffer, 1, BUFFER_SIZE, fp);
+								nbytes += writeMessage(newfd, buffer, nread);
 								bzero(buffer, BUFFER_SIZE);
 							}
 
@@ -390,10 +395,18 @@ int main(int argc, char *argv[]) {
 								perror("fclose()");
 								exit(1);
 							}
+
+							if(verbose) {
+								printf("File %s was sent!\n", FName);
+							}
 						}
 						else {
 							sprintf(buffer, "RRT NOK\n");
 							writeMessage(newfd, buffer, strlen(buffer));
+
+							if(verbose) {
+								printf(buffer);
+							}
 						}
 					}
 					else if(Fop == 'D') {
@@ -403,17 +416,18 @@ int main(int argc, char *argv[]) {
 						if(d) {
 							sprintf(buffer, "%s/%s", dirname, FName);
 
-							if(remove(buffer) == 0){
-								writeMessage(newfd, "RDL OK\n", (long) 7);
+							if(remove(buffer) == 0) {
+								sprintf(buffer, "RDL OK\n");
 							}
-							else{
-								writeMessage(newfd, "RDL EOF\n", (long) 8);
+							else {
+								sprintf(buffer, "RDL EOF\n");
 							}
 						}
 						else{
-							writeMessage(newfd, "RDL NOK\n", (long) 8);
+							sprintf(buffer, "RDL NOK\n");
 						}
-						break;
+
+						writeMessage(newfd, buffer, strlen(buffer));
 					}
 					else if(Fop == 'U') {
 						i = 0; 
@@ -476,8 +490,6 @@ int main(int argc, char *argv[]) {
 
 						size = strtol(fsize, NULL, 10);
 						nbytes = 0;
-
-						printf("size: %ld\n", size);
 
 						while(nbytes < size) {
 							nread = read(newfd, buffer, BUFFER_SIZE);

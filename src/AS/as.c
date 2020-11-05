@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			if(verbose) {
-				puts(buffer);
+				printf(buffer);
 			}
 
 			sscanf(buffer, "%s ", arg1);
@@ -270,7 +270,7 @@ int main(int argc, char *argv[]) {
 							sendto(asudpfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
 							if(verbose) {
-								puts("RRG NOK");
+								printf("RRG NOK\n");
 							}
 							continue;
 						}
@@ -319,7 +319,7 @@ int main(int argc, char *argv[]) {
 								}
 
 								if(verbose) {
-									puts("RRG OK");
+									printf("RRG OK\n");
 								}
 
 								fclose(fp);
@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
 									}
 
 									if(verbose) {
-										puts("RRG OK");
+										printf("RRG OK\n");
 									}
 								}
 								else {
@@ -351,7 +351,7 @@ int main(int argc, char *argv[]) {
 									}
 
 									if(verbose) {
-										puts("RRG NOK");
+										printf("RRG NOK\n");
 									}
 								}
 
@@ -392,7 +392,7 @@ int main(int argc, char *argv[]) {
 					}
 
 					if(verbose) {
-						puts("RRG ERR\n");
+						printf("RRG ERR\n");
 					}
 				}
 
@@ -414,7 +414,7 @@ int main(int argc, char *argv[]) {
 						}
 
 						if(verbose) {
-							puts("RUN NOK\n");
+							printf("RUN NOK\n");
 						}
 					}
 					//user exists
@@ -449,7 +449,7 @@ int main(int argc, char *argv[]) {
 								}
 
 								if(verbose) {
-									puts("RUN OK\n");
+									printf("RUN OK\n");
 								}
 							}
 							else {
@@ -461,7 +461,7 @@ int main(int argc, char *argv[]) {
 								}
 
 								if(verbose) {
-									puts("RUN NOK\n");
+									printf("RUN NOK\n");
 								}
 							}
 						}
@@ -475,7 +475,7 @@ int main(int argc, char *argv[]) {
 							}
 
 							if(verbose) {
-								puts("RUN NOK\n");
+								printf("RUN NOK\n");
 							}
 						}
 					}
@@ -507,7 +507,7 @@ int main(int argc, char *argv[]) {
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
 						if(verbose) {
-							puts(buffer);
+							printf(buffer);
 						}
 
 						if(n < 0) {
@@ -571,7 +571,7 @@ int main(int argc, char *argv[]) {
 					}
 
 					if(verbose) {
-						puts(buffer);
+						printf(buffer);
 					}
 				}
 			}
@@ -584,7 +584,7 @@ int main(int argc, char *argv[]) {
 				}
 
 				if(verbose) {
-					puts("ERR\n");
+					printf("ERR\n");
 				}		
 			}
 		}
@@ -618,12 +618,12 @@ int main(int argc, char *argv[]) {
 				while(true) {
 					n = readMessage(newfd, buffer);
 
-					buffer[n] = '\0';
-
 					if(n < 0) {
 						perror("read()");
 						exit(1);
 					}
+
+					buffer[n] = '\0';
 
 					sscanf(buffer, "%s ", arg1);
 					
@@ -631,7 +631,7 @@ int main(int argc, char *argv[]) {
 						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
 
 						if(verbose) {
-							puts(buffer);
+							printf(buffer);
 						}
 
 						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
@@ -708,19 +708,22 @@ int main(int argc, char *argv[]) {
 						ret = sscanf(buffer, "REQ %s %s %s %s", arg1, arg2, arg3, arg4);
 
 						if(verbose) {
-							puts(buffer);
+							printf(buffer);
 						}
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
 							writeMessage(newfd, "RRQ ERR\n", 8);
+							continue;
 						}
 
 						if(!userExists(arg1)) {
 							writeMessage(newfd, "RRQ EUSER\n", 10);
+							continue;
 						}
 
 						if(userIsLoggedIn(arg1) != true || strcmp(UID, arg1) != 0) {
 							writeMessage(newfd, "RRQ ELOG\n", 9);
+							continue;
 						}
 
 						if(strcmp(arg3, "X") == 0 || strcmp(arg3, "L") == 0 || strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) {
@@ -732,6 +735,8 @@ int main(int argc, char *argv[]) {
 								}
 								else {
 									writeMessage(newfd, "RRQ ERR\n", 8);
+									printf("RRQ ERR\n");
+									continue;
 								}
 							}
 							else if((strcmp(arg3, "L") == 0 || strcmp(arg3, "X") == 0) && ret == 3) {
@@ -739,6 +744,8 @@ int main(int argc, char *argv[]) {
 							}
 							else {
 								writeMessage(newfd, "RRQ ERR\n", 8);
+								printf("RRQ ERR\n");
+								continue;
 							}
 
 							sprintf(filename, "AS/USERS/%s/%s_reg.txt", arg1, arg1);
@@ -785,20 +792,23 @@ int main(int argc, char *argv[]) {
 							sscanf(buffer, "RVC %s %s", arg1, arg2);
 							if(strcmp(arg2, "OK") == 0){
 								writeMessage(newfd, "RRQ OK\n", 7);
+								printf("RRQ OK\n");
 							}
 							else {
 								writeMessage(newfd, "RRQ EUSER\n", 10);
+								printf("RRQ EUSER\n");
 							}
 						}
 						else {
 							writeMessage(newfd, "RRQ EFOP\n", 9);
+							printf("RRQ EFOP\n");
 						}
 					}
 					else if(strcmp(arg1, "AUT") == 0) {
 						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3);
 
 						if(verbose) {
-							puts(buffer);
+							printf(buffer);
 						}
 
 						potentialVC = strtol(arg3, NULL, 10);
@@ -847,8 +857,13 @@ int main(int argc, char *argv[]) {
 						writeMessage(newfd, "EXIT\n", 5);
 						sprintf(filename, "AS/USERS/%s/%s_login.txt", arg2, arg2);
 						remove(filename);
+						printf("EXIT\n");
 
 						break;
+					}
+					else {
+						writeMessage(newfd, "ERR\n", 4);
+						printf("ERR\n");
 					}
 				}
 
