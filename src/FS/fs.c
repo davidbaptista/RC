@@ -445,8 +445,6 @@ int main(int argc, char *argv[]) {
 						
 						sprintf(buffer, "%s/%s", dirname, FName);
 
-						puts(buffer);
-
 						fp = fopen(buffer, "wb");
 
 						if(fp == NULL) {
@@ -457,7 +455,7 @@ int main(int argc, char *argv[]) {
 						ptr = fsize;
 						nbytes = 0;
 
-						while(1) {
+						while(true) {
 							nread = read(newfd, ptr, 1);
 
 							if(nread == -1) {
@@ -479,16 +477,30 @@ int main(int argc, char *argv[]) {
 						size = strtol(fsize, NULL, 10);
 						nbytes = 0;
 
+						printf("size: %ld\n", size);
+
 						while(nbytes < size) {
 							nread = read(newfd, buffer, BUFFER_SIZE);
 							nbytes += nread;
 
+							if(nread == 0) {
+								break;
+							}
+							if(nbytes >= size) {
+								nread -= (nbytes - size); 
+							}
+
 							if(fwrite(buffer, 1, nread, fp) < 0) {
+								perror("fwrite()");
 								exit(1);
 							}
 
 							bzero(buffer, BUFFER_SIZE);
 						}
+						
+						fclose(fp);
+
+						writeMessage(newfd, "RUP OK\n", 7);
 					}
 					else if(Fop == 'X') {
 						d = opendir(dirname);

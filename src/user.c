@@ -372,6 +372,7 @@ int main(int argc, char *argv[]) {
 					nbytes += nread;
 
 					if(fwrite(message, 1, nread, fp) < 0) {
+						perror("fwrite()");
 						exit(1);
 					}
 
