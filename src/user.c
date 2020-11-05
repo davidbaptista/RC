@@ -503,12 +503,14 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(message, "RRM OK\n") == 0){
 				puts("Operation succeeded");
-				break;
-			}else if(strcmp(message, "RRM NOK\n") == 0){
+			}
+			else if(strcmp(message, "RRM NOK\n") == 0){
 				puts(NOK_MESSAGE);
-			}else if(strcmp(message, "RRM INV\n") == 0){
+			}
+			else if(strcmp(message, "RRM INV\n") == 0){
 				puts(TID_MESSAGE);
-			}else{
+			}
+			else{
 				puts(ERR_MESSAGE);
 			}	
 		}

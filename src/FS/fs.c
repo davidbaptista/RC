@@ -520,6 +520,10 @@ int main(int argc, char *argv[]) {
 						if(d) {
 							bool ok = true;
 							while((dir = readdir(d)) != NULL) {
+								if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+									continue;
+								}
+
 								sprintf(buffer, "%s/%s", dirname, dir->d_name);
 
 								if(remove(buffer) != 0) {
@@ -533,12 +537,16 @@ int main(int argc, char *argv[]) {
 							}
 
 							if(ok) {
-								writeMessage(newfd, "REM OK\n", (long) 7);
+								writeMessage(newfd, "RRM OK\n", (long) 7);
+								printf("RRM OK\n");
 							}
-
+							else {
+								writeMessage(newfd, "RRM ERR\n", (long) 8);
+							}
 						}
 						else {
 							writeMessage(newfd, "RRM NOK\n", (long) 8);
+							printf("RRM NOK\n");
 						}
 					}
 					else if(Fop == 'E') {

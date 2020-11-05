@@ -105,14 +105,20 @@ bool userIsLoggedIn(char* UID){
 		return false;
 	}
 
-	fclose(fp);
+	if(fclose(fp) != 0) {
+		perror("fclose()");
+		exit(1);
+	}
 
 	sprintf(filename, "AS/USERS/%s/%s_reg.txt", UID, UID);
 	if((fp = fopen(filename, "r")) == NULL){
 		return false;
 	}
 
-	fclose(fp);
+	if(fclose(fp) != 0) {
+		perror("fclose()");
+		exit(1);
+	}
 
 	return true;
 }
@@ -126,6 +132,11 @@ bool userExists(char* UID){
 
 	if(!d) {
 		return false;
+	}
+
+	if(closedir(d) != 0) {
+		perror("closedir()");
+		exit(1);
 	}
 	return true;
 }
@@ -302,12 +313,14 @@ int main(int argc, char *argv[]) {
 									exit(1);
 								}
 
-								n = fwrite(arg3, 1, strlen(arg3), fp);
+								n = fwrite(arg3, 1, 8, fp);
 
 								if(n != 8) {
 									perror("fwrite()");
 
-									fclose(fp);
+									if(fclose(fp) != 0) {
+										perror("fclose()");
+									}
 									exit(1);
 								}
 
@@ -322,12 +335,20 @@ int main(int argc, char *argv[]) {
 									printf("RRG OK\n");
 								}
 
-								fclose(fp);
+								if(fclose(fp) != 0) {
+									perror("fclose()");
+									exit(1);
+								}
 							}
 							//user already registrated
 							else {
 								n = fread(buffer, 1, BUFFER_SIZE, fp);
 								buffer[n] = '\0';
+
+								if(fclose(fp) != 0) {
+									perror("fclose()");
+									exit(1);
+								}
 
 								//verifies user's credentials
 								if(strcmp(buffer, arg3) == 0) {
@@ -354,8 +375,6 @@ int main(int argc, char *argv[]) {
 										printf("RRG NOK\n");
 									}
 								}
-
-								fclose(fp);
 							}
 							sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
 
@@ -375,7 +394,15 @@ int main(int argc, char *argv[]) {
 								exit(1);
 							}
 
-							fclose(fp);
+							if(fclose(fp) != 0) {
+								perror("fclose()");
+								exit(1);
+							}
+
+							if(closedir(d) != 0) {
+								perror("closedir()");
+								exit(1);
+							}
 						}
 						else {
 							perror("opendir()");
@@ -400,13 +427,11 @@ int main(int argc, char *argv[]) {
 			else if(strcmp(arg1, "UNR") == 0) {
 				n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
 
-				if(n==3) {
+				if(n == 3) {
 					sprintf(dirname, "AS/USERS/%s", arg2);
 
-					d = opendir(dirname);
-
 					//user doesnt exist
-					if(!d) {
+					if(!userExists(arg2)) {
 						sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 						if(n < 0) {
 							perror("sendto()");
@@ -430,6 +455,11 @@ int main(int argc, char *argv[]) {
 
 						n = fread(buffer, 1, BUFFER_SIZE, fp);
 						buffer[n] = '\0';
+
+						if(fclose(fp) != 0) {
+							perror("fclose()");
+							exit(1);
+						}
 
 						//verifies user's credentials
 						if(strcmp(buffer, arg3) == 0) {
@@ -514,20 +544,27 @@ int main(int argc, char *argv[]) {
 							perror("sendto()");
 							exit(1);
 						}
+
+						continue;
 					}
 
 					n = fread(buffer, 1, 5, fp);
 
-					buffer[n - 1] = '\0';
+					buffer[n - 1] = '\0';	// apagar o espaco
 
 					if(strcmp(buffer, arg2) == 0) {
 						n = fread(aux, 1, AUX_SIZE, fp);
 						aux[n] = '\0';
 
+						if(fclose(fp) != 0) {
+							perror("fclose()");
+						}
+
 						sprintf(buffer, "CNF %s %s %s\n", arg1, arg2, aux);
 
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
+						// remover o ficheiro do tid
 						if(remove(filename) != 0) {
 							perror("remove()");
 							exit(1);
@@ -539,9 +576,17 @@ int main(int argc, char *argv[]) {
 							sprintf(dirname, "AS/USERS/%s", arg1);
 							d = opendir(dirname);
 
-							while((dir = readdir(d)) != NULL) {
-								sprintf(buffer, "%s/%s", dirname, dir->d_name);
+							if(!d) {
+								perror("opendir()");
+								exit(1);
+							}
 
+							while((dir = readdir(d)) != NULL) {
+								if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+									continue;
+								}
+
+								sprintf(buffer, "%s/%s", dirname, dir->d_name);
 								if(remove(buffer) != 0) {
 									ok = false;
 								}
@@ -556,7 +601,6 @@ int main(int argc, char *argv[]) {
 								perror("remove()");
 								exit(1);
 							}
-
 						}
 					}
 					else {
@@ -636,17 +680,14 @@ int main(int argc, char *argv[]) {
 
 						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
 							writeMessage(newfd, "RLO ERR\n", 8);
-							close(newfd);
-							exit(1);
+							continue;
 						}
 
 						sprintf(dirname, "AS/USERS/%s", arg2);
 
-						d = opendir(dirname);
-
-						if(!d) {
+						if(!userExists(arg2)) {
 							writeMessage(newfd, "RLO ERR\n", 8);
-							close(newfd);
+							continue;
 						}
 
 						sprintf(filename, "%s/%s_reg.txt", dirname, arg2);
@@ -655,8 +696,7 @@ int main(int argc, char *argv[]) {
 
 						if(fp == NULL) {
 							writeMessage(newfd, "RLO ERR\n", 8);
-							close(newfd);
-							exit(1);
+							continue;
 						}
 
 						if(fclose(fp) != 0) {
@@ -671,19 +711,18 @@ int main(int argc, char *argv[]) {
 
 						if(fp == NULL) {
 							writeMessage(newfd, "RLO ERR\n", 8);
-							close(newfd);
-							exit(1);
+							continue;
 						}
 
 						n = fread(buffer, 1, BUFFER_SIZE, fp);
 						buffer[n] = '\0';
 
-						if(strcmp(buffer, arg3) == 0) {
-							if(fclose(fp) != 0) {
-								perror("fclose()");
-								exit(1);
-							}
+						if(fclose(fp) != 0) {
+							perror("fclose()");
+							exit(1);
+						}
 
+						if(strcmp(buffer, arg3) == 0) {
 							sprintf(filename, "%s/%s_login.txt", dirname, arg2);
 							strcpy(UID, arg2);
 
@@ -698,10 +737,11 @@ int main(int argc, char *argv[]) {
 							}
 
 							writeMessage(newfd, "RLO OK\n", 7);
+							printf("RLO OK\n");
 						}
 						else {
-							fclose(fp);
 							writeMessage(newfd, "RLO NOK\n", 8);
+							printf("RLO NOK\n");
 						}
 					}
 					else if(strcmp(arg1, "REQ") == 0) {
@@ -713,16 +753,19 @@ int main(int argc, char *argv[]) {
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
 							writeMessage(newfd, "RRQ ERR\n", 8);
+							printf("RRQ ERR\n");
 							continue;
 						}
 
 						if(!userExists(arg1)) {
 							writeMessage(newfd, "RRQ EUSER\n", 10);
+							printf("RRQ EUSER\n");
 							continue;
 						}
 
 						if(userIsLoggedIn(arg1) != true || strcmp(UID, arg1) != 0) {
 							writeMessage(newfd, "RRQ ELOG\n", 9);
+							printf("RRQ ELOG\n");
 							continue;
 						}
 
@@ -780,7 +823,6 @@ int main(int argc, char *argv[]) {
 
 							strcpy(Fop, arg3);
 
-
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
 							if(n == -1) {
 								exit(1);
@@ -833,7 +875,7 @@ int main(int argc, char *argv[]) {
 									sprintf(buffer, "%04d %s %s", TID, Fop, FName);
 								}
 
-								fwrite(buffer, strlen(buffer), 1, fp);
+								fwrite(buffer, 1, strlen(buffer), fp);
 
 								if(fclose(fp) != 0) {
 									perror("fclose()");
@@ -853,7 +895,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 					else if(strcmp(arg1, "EXIT") == 0) {
-						sscanf(buffer, "EXIT %s", arg2);
+						sscanf(buffer, fopen"EXIT %s", arg2);
 						writeMessage(newfd, "EXIT\n", 5);
 						sprintf(filename, "AS/USERS/%s/%s_login.txt", arg2, arg2);
 						remove(filename);
@@ -861,9 +903,9 @@ int main(int argc, char *argv[]) {
 
 						break;
 					}
-					else {
+					else { // TODO: problemas aqui
 						writeMessage(newfd, "ERR\n", 4);
-						printf("ERR\n");
+					//	printf("ERR\n");
 					}
 				}
 
