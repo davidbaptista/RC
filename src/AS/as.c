@@ -27,6 +27,7 @@
 #define AUX_SIZE 64
 
 bool verbose = false;
+bool cycle = true;
 
 char *asPort = NULL;
 
@@ -157,7 +158,7 @@ int main(int argc, char *argv[]) {
 	char filename[128];
 	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
-	char arg1[16], arg2[16], arg3[16], arg4[16], arg5[16];
+	char arg1[16], arg2[16], arg3[16], arg4[128], arg5[16];
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
@@ -167,6 +168,7 @@ int main(int argc, char *argv[]) {
 	parseArgs(argc, argv);
 
 	if(sigaction(SIGCHLD, &act, NULL) == -1) {
+		perror("sigaction()");
 		exit(1);
 	}
 
@@ -224,10 +226,11 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	while(true) {
+	while(cycle) {
 		FD_ZERO(&fds);
 		FD_SET(asudpfd, &fds);
 		FD_SET(astcpfd, &fds);
+		FD_SET(0, &fds);
 
 		counter = select(max(asudpfd, astcpfd) + 1, &fds, (fd_set *) NULL, (fd_set *)NULL, (struct timeval *) NULL);
  		if(counter <= 0) {
@@ -758,7 +761,7 @@ int main(int argc, char *argv[]) {
 							continue;
 						}
 
-						if(!userExists(arg1)) {
+						if(userExists(arg1) != true) {
 							writeMessage(newfd, "RRQ EUSER\n", 10);
 							printf("RRQ EUSER\n");
 							continue;
@@ -770,8 +773,18 @@ int main(int argc, char *argv[]) {
 							continue;
 						}
 
+						if((strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) && ret == 4) {
+							if(strlen(arg4) > 24) {
+								writeMessage(newfd, "RRQ ERR\n", 8);
+								printf("RRQ ERR\n");
+								continue;							
+							}
+						}
+
 						if(strcmp(arg3, "X") == 0 || strcmp(arg3, "L") == 0 || strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) {
 							bool hasFname = false;
+
+							puts(arg3);
 
 							if((strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) && ret == 4) {
 								if(strlen(arg4) <= 24) {
@@ -831,6 +844,7 @@ int main(int argc, char *argv[]) {
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
 							if(n == -1) {
+								perror("sendto()");
 								exit(1);
 							}
 
@@ -911,7 +925,7 @@ int main(int argc, char *argv[]) {
 					}
 					else { // TODO: problemas aqui
 						writeMessage(newfd, "ERR\n", 4);
-					//	printf("ERR\n");
+						printf("ERR\n");
 					}
 				}
 
@@ -927,9 +941,20 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 		}
+		if(FD_ISSET(0, &fds)) {
+            fgets(buffer, sizeof(buffer), stdin);
+			buffer[4] = '\0';
+
+			if(strcmp(buffer, "exit") == 0) {
+				cycle = false;
+				printf("Closing AS\n");
+			}
+		}
 	}
 
 	freeaddrinfo(asudpres);
+	freeaddrinfo(astcpres);
+	close(astcpfd);
 	close(asudpfd);
 	exit(0);
 }
