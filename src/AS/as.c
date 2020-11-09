@@ -81,7 +81,7 @@ long readMessage(int fd, char *msg) {
 			exit(1);
 		}
 		else if(nread == 0) {
-			break;
+			return 0;
 		}
 
 		nleft -= nread;
@@ -232,7 +232,7 @@ int main(int argc, char *argv[]) {
 		FD_SET(astcpfd, &fds);
 		FD_SET(0, &fds);
 
-		counter = select(max(asudpfd, astcpfd) + 1, &fds, (fd_set *) NULL, (fd_set *)NULL, (struct timeval *) NULL);
+		counter = select(max(asudpfd, astcpfd) + 1, &fds, (fd_set *)NULL, (fd_set *)NULL, (struct timeval *)NULL);
  		if(counter <= 0) {
             exit(1);
         }
@@ -670,6 +670,12 @@ int main(int argc, char *argv[]) {
 						perror("read()");
 						exit(1);
 					}
+					else if(n == 0) {
+						sprintf(filename, "AS/USERS/%s/%s_login.txt", arg2, arg2);
+						remove(filename);
+						printf("Closing user connection\n");
+						break;
+					}
 
 					buffer[n] = '\0';
 
@@ -914,16 +920,7 @@ int main(int argc, char *argv[]) {
 							writeMessage(newfd, "RAU 0\n", 6);
 						}
 					}
-					else if(strcmp(arg1, "EXIT") == 0) {
-						sscanf(buffer, "EXIT %s", arg2);
-						writeMessage(newfd, "EXIT\n", 5);
-						sprintf(filename, "AS/USERS/%s/%s_login.txt", arg2, arg2);
-						remove(filename);
-						printf("EXIT\n");
-
-						break;
-					}
-					else { // TODO: problemas aqui
+					else {
 						writeMessage(newfd, "ERR\n", 4);
 						printf("ERR\n");
 					}

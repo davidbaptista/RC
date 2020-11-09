@@ -515,14 +515,9 @@ int main(int argc, char *argv[]) {
 			}	
 		}
 		else if(strcmp(command, "exit") == 0) {
-			sprintf(message, "EXIT %s\n", UID);
-			writeMessage(asfd, message, strlen(message));
-			readMessage(asfd, message);
-	
 			freeaddrinfo(asres);
 			close(asfd);
 			exit(0);
-
 		}
 		else {
 			puts(PROTOCOL_ERROR_MESSAGE);
