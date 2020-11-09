@@ -17,7 +17,7 @@
 
 #define NOK_MESSAGE "Error: User ID does not exist"
 #define ERR_MESSAGE "Error: Operation failed"
-#define TID_MESSAGE "Error: Wrong TID"
+#define TID_MESSAGE "Error: AS Authentication Error"
 #define EOF_MESSAGE "Error: File is not available"
 #define ELOG_MESSAGE "Error: There was no established login"
 #define EPD_MESSAGE "Error: AS could not communicate with PD"
@@ -127,6 +127,9 @@ int main(int argc, char *argv[]) {
 	char arg1[128], arg2[128];
 	int c;
 
+	bool logged = false;
+	bool cycle = true;
+
 	//command vars
 	char Fname[25];
 	char TID[5];
@@ -164,7 +167,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	while(true) {
+	while(cycle) {
 		fgets(line, sizeof(line), stdin);
 
 		c = sscanf(line, "%s %s %s", command, arg1, arg2);
@@ -178,13 +181,14 @@ int main(int argc, char *argv[]) {
 			if(strcmp(message, "RLO OK\n")==0) {
 				strcpy(UID, arg1);
 				strcpy(pass, arg2);
+				logged = true;
 				puts("You are now logged in");
 			}
 			else {
 				puts("Login failed!");
 			}
 		}
-		else if(strcmp(command, "req") == 0) {
+		else if(strcmp(command, "req") == 0 && logged) {
 			RID = rand() % 10000;
 
 			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "L") == 0 || strcmp(arg1, "D") == 0 || strcmp(arg1, "X") == 0) {
@@ -229,7 +233,7 @@ int main(int argc, char *argv[]) {
 				puts(ERR_MESSAGE);
 			}
 		}
-		else if(strcmp(command, "val") == 0) {
+		else if(strcmp(command, "val") == 0 && logged) {
 			if(RID == -1) {
 				puts("No request has been made");
 				continue;
@@ -248,7 +252,7 @@ int main(int argc, char *argv[]) {
 				puts("Authentication Failed!");
 			}
 		}
-		else if(strcmp(command, "list") == 0 || strcmp(command, "l") == 0) {
+		else if((strcmp(command, "list") == 0 || strcmp(command, "l") == 0) && logged) {
 			int i = 0;
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -301,7 +305,7 @@ int main(int argc, char *argv[]) {
 
 			close(fsfd);
 		}
-		else if(strcmp(command, "retrieve") == 0 || strcmp(command, "r") == 0) {
+		else if((strcmp(command, "retrieve") == 0 || strcmp(command, "r") == 0) && logged) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -309,7 +313,7 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			sprintf(message, "RTV %s %s %s\n", UID, TID, Fname);
+			sprintf(message, "RTV %s %s %s\n", UID, TID, arg1);
 			writeMessage(fsfd, message, strlen(message));
 
 			ssize_t nleft = 7, nread, ntotal = 0;
@@ -403,15 +407,16 @@ int main(int argc, char *argv[]) {
 
 			close(fsfd);
 		}
-		else if(strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) {
+		else if((strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) && logged) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
 			if(n == -1) {
+				perror("connect()");
 				exit(1);
 			}
 
-			sprintf(message, "UPL %s %s %s\n", UID, TID, Fname);
+			sprintf(message, "UPL %s %s %s ", UID, TID, arg1);
 
 			FILE *fp = fopen(Fname, "rb");
 
@@ -420,16 +425,18 @@ int main(int argc, char *argv[]) {
 			}
 			else {
 				writeMessage(fsfd, message, strlen(message));
+				puts(message);
 				fseek(fp, 0, SEEK_END);
 				long size = ftell(fp);
 				fseek(fp, 0, SEEK_SET);
 				sprintf(message, "%ld ", size);
 				writeMessage(fsfd, message, strlen(message));
+				puts(message);
 				long nbytes = 0;
 				
 				while(nbytes < size) {
-					fread(message, 1, MESSAGE_SIZE, fp);
-					nbytes += writeMessage(fsfd, message, MESSAGE_SIZE);
+					n = fread(message, 1, MESSAGE_SIZE, fp);
+					nbytes += writeMessage(fsfd, message, n);
 					bzero(message, MESSAGE_SIZE);
 				}
 
@@ -457,7 +464,7 @@ int main(int argc, char *argv[]) {
 			}
 			close(fsfd);
 		}
-		else if(strcmp(command, "delete") == 0 || strcmp(command, "d") == 0) {
+		else if((strcmp(command, "delete") == 0 || strcmp(command, "d") == 0) && logged) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -465,7 +472,7 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 
-			sprintf(message, "DEL %s %s %s\n", UID, TID, Fname);
+			sprintf(message, "DEL %s %s %s\n", UID, TID, arg1);
 			writeMessage(fsfd, message, strlen(message));
 			readMessage(fsfd, message);
 
@@ -488,7 +495,7 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 
 		}
-		else if(strcmp(command, "remove") == 0 || strcmp(command,"x") == 0) {
+		else if((strcmp(command, "remove") == 0 || strcmp(command,"x") == 0) && logged) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -515,8 +522,8 @@ int main(int argc, char *argv[]) {
 			}	
 		}
 		else if(strcmp(command, "exit") == 0) {
-			freeaddrinfo(asres);
-			close(asfd);
+			logged = false;
+			cycle = false;
 			exit(0);
 		}
 		else {

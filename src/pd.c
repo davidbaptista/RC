@@ -203,7 +203,12 @@ int main(int argc, char *argv[]) {
 				}
             }
 			else {
-				puts(PROTOCOL_ERROR_MESSAGE);
+				if(strcmp(command, "exit") == 0) {
+					puts("User is already unregistered. Nothing was done");
+				}
+				else {
+					puts(PROTOCOL_ERROR_MESSAGE);
+				}
 			}
         }
     }

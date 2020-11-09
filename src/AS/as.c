@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			if(verbose) {
-				printf(buffer);
+				//printf(buffer);
 			}
 
 			sscanf(buffer, "%s ", arg1);
@@ -539,7 +539,7 @@ int main(int argc, char *argv[]) {
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
 						if(verbose) {
-							printf(buffer);
+							//printf(buffer);
 						}
 
 						if(n < 0) {
@@ -619,7 +619,7 @@ int main(int argc, char *argv[]) {
 					}
 
 					if(verbose) {
-						printf(buffer);
+						//printf(buffer);
 					}
 				}
 			}
@@ -685,7 +685,7 @@ int main(int argc, char *argv[]) {
 						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
 
 						if(verbose) {
-							printf(buffer);
+							//printf(buffer);
 						}
 
 						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
@@ -758,7 +758,7 @@ int main(int argc, char *argv[]) {
 						ret = sscanf(buffer, "REQ %s %s %s %s", arg1, arg2, arg3, arg4);
 
 						if(verbose) {
-							printf(buffer);
+							//printf(buffer);
 						}
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
@@ -789,8 +789,6 @@ int main(int argc, char *argv[]) {
 
 						if(strcmp(arg3, "X") == 0 || strcmp(arg3, "L") == 0 || strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) {
 							bool hasFname = false;
-
-							puts(arg3);
 
 							if((strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) && ret == 4) {
 								if(strlen(arg4) <= 24) {
@@ -876,7 +874,7 @@ int main(int argc, char *argv[]) {
 						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3);
 
 						if(verbose) {
-							printf(buffer);
+							//printf(buffer);
 						}
 
 						potentialVC = strtol(arg3, NULL, 10);

@@ -75,6 +75,7 @@ long writeMessage(int fd, char *msg, long int msgSize) {
 		nwritten = write(fd, ptr, nleft);
 
 		if(nwritten <= 0) {
+			puts("write()");
 			exit(1);
 		}
 		ntotal += nwritten;
@@ -95,6 +96,7 @@ long readMessage(int fd, char *msg, long int msgSize) {
 		nread = read(fd, ptr, nleft);
 
 		if(nread == -1) {
+			puts("read()");
 			exit(1);
 		}
 		else if(nread == 0) {
@@ -140,7 +142,7 @@ int main(int argc, char *argv[]) {
 	char dirname[64];
 	char TID[TID_SIZE] = "0000";
 	char UID[UID_SIZE];
-	char aux[AUX_SIZE]; 			// used for building the list buffer
+	char aux[AUX_SIZE]; // used for building the list buffer
 	long size;
 	int i = 0;
 	bool dup = false;
@@ -148,16 +150,19 @@ int main(int argc, char *argv[]) {
     parseArgs(argc, argv);
 
 	if(sigaction(SIGCHLD, &act, NULL) == -1) {
+		perror("sigaction()");
 		exit(1);
 	}
 
     asfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
     if(asfd == -1) {
+		perror("UDP socket()");
         exit(1);
     }
 
 	fsfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fsfd == -1) {
+		perror("TCP socket()");
 		exit(1);
 	}
 
@@ -210,32 +215,53 @@ int main(int argc, char *argv[]) {
 		else if(pid == 0) {
 			close(fsfd);
 
-			n = readMessage(newfd, buffer, BUFFER_SIZE);
+			char sockname[32];
+			struct sockaddr_in addr;
+			socklen_t addrsize = sizeof(struct sockaddr_in);
+
+			if(getpeername(newfd, (struct sockaddr*)&addr, &addrsize) != 0) {
+				perror("getpeername()");
+				exit(1);
+			}
+
+			strcpy(sockname, inet_ntoa(addr.sin_addr));
+
+			n = readMessage(newfd, buffer, 15);
 
 			if(n < 0) {
 				perror("read()");
 				break;
 			}
 
-			buffer[n] = '\0';
+			if(n != 15) {
+				printf("Unexpected error\n");
+				exit(1);
+			}
+
+			buffer[n-1] = '\0';
 
 			sscanf(buffer, "%s %s %s", command, UID, TID);
 
 			if(verbose) {
 				printf(buffer);
+				printf(" ");
 			}
 			
 			if(strlen(UID) == 5 && strlen(TID) == 4) {
+				bool hasFname = false;
 				if(strcmp(command, "LST") == 0) {
 					strcpy(command, "RLS");
 				}
 				else if(strcmp(command, "RTV") == 0) {
+					hasFname = true;
 					strcpy(command, "RRT");
 				}
 				else if(strcmp(command, "UPL") == 0) {
+					hasFname = true;
 					strcpy(command, "RUP");
 				}
 				else if(strcmp(command, "DEL") == 0) {
+					hasFname = true;
 					strcpy(command, "RDL");
 				}
 				else if(strcmp(command, "REM") == 0) {
@@ -244,6 +270,33 @@ int main(int argc, char *argv[]) {
 				else {
 					writeMessage(newfd, "ERR\n", 4);
 					break;
+				}
+
+				char possibleFName[32];
+				if(hasFname) {
+					ptr = possibleFName;
+					nbytes = 0;
+
+					while(nbytes < 25) {
+						nread = read(newfd, ptr, 1);
+
+						if(nread == -1) {
+							break;
+						}
+						else if(nread == 0) {
+							break;
+						}
+						nbytes += nread;
+
+						if(ptr[nread-1] == ' ' || ptr[nread-1] == '\n') {
+							break;
+						}
+						ptr += nread;
+					}
+
+					possibleFName[nbytes-1] = '\0';
+
+					puts(possibleFName);
 				}
 
 				sprintf(buffer, "VLD %s %s\n", UID, TID);
@@ -271,6 +324,10 @@ int main(int argc, char *argv[]) {
 				
 				if(verbose) {
 					printf(buffer);
+				}
+
+				if(hasFname && strcmp(FName, possibleFName) != 0) {
+					Fop = 'E';
 				}
 
 				sprintf(dirname, "FS/USERS/%s", UID);
@@ -339,11 +396,11 @@ int main(int argc, char *argv[]) {
 				else if(Fop == 'R') {
 					d = opendir(dirname);
 					fp = NULL;
-
+			
 					if(d) {
 						sprintf(buffer, "%s/%s", dirname, FName);
 						fp = fopen(buffer, "rb");
-
+						puts(buffer);
 						if(fp == NULL) {
 							sprintf(buffer, "RRT EOF\n");
 							if(verbose) {
@@ -428,8 +485,6 @@ int main(int argc, char *argv[]) {
 					writeMessage(newfd, buffer, strlen(buffer));
 				}
 				else if(Fop == 'U') {
-					i = 0; 
-					dup = false;
 					d = opendir(dirname);
 
 					if(!d){
@@ -437,7 +492,13 @@ int main(int argc, char *argv[]) {
 						d = opendir(dirname);
 					}
 
+					i = 0; 
+					dup = false;
 					while((dir = readdir(d)) != NULL) {
+						if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
+							i--;
+							continue;
+						}
 						if(strcmp(dir->d_name, FName) == 0){
 							dup = true;
 							break;
@@ -486,16 +547,22 @@ int main(int argc, char *argv[]) {
 
 					fsize[nbytes] = '\0';
 
+					// if file is too big. No specific error message
+					if(strlen(fsize) > 10) {
+						writeMessage(newfd, "RUP ERR\n", (long)8);
+						break;
+					}
+
 					size = strtol(fsize, NULL, 10);
 					nbytes = 0;
 
 					while(nbytes < size) {
 						nread = read(newfd, buffer, BUFFER_SIZE);
 						nbytes += nread;
-
 						if(nread == 0) {
 							break;
 						}
+
 						if(nbytes >= size) {
 							nread -= (nbytes - size); 
 						}
