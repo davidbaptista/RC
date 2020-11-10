@@ -162,6 +162,7 @@ int main(int argc, char *argv[]) {
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
+	struct timeval tv;
 
 	act.sa_handler = SIG_IGN;
 
@@ -179,6 +180,18 @@ int main(int argc, char *argv[]) {
 
 	if((pdfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("socket()");
+		exit(1);
+	}
+
+	tv.tv_sec = 10;
+	tv.tv_usec = 0; // 10 seconds I think
+	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+		perror("setsockopt()");
+		exit(1);
+	}
+
+	if (setsockopt(pdfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0) {
+		perror("setsockopt()");
 		exit(1);
 	}
 
@@ -847,13 +860,21 @@ int main(int argc, char *argv[]) {
 							strcpy(Fop, arg3);
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
-							if(n == -1) {
-								perror("sendto()");
-								exit(1);
+						
+							if(n < 0) {
+								writeMessage(newfd, "RRQ EPD\n", 8);
+								puts("RRQ EPD");
+								continue;
 							}
 
 							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 							buffer[n]= '\0';
+
+							if(n < 0) {
+								writeMessage(newfd, "RRQ EPD\n", 8);
+								puts("RRQ EPD");
+								continue;
+							}
 
 							sscanf(buffer, "RVC %s %s", arg1, arg2);
 							if(strcmp(arg2, "OK") == 0){
@@ -864,6 +885,8 @@ int main(int argc, char *argv[]) {
 								writeMessage(newfd, "RRQ EUSER\n", 10);
 								printf("RRQ EUSER\n");
 							}
+
+							freeaddrinfo(pdres);
 						}
 						else {
 							writeMessage(newfd, "RRQ EFOP\n", 9);
@@ -912,10 +935,12 @@ int main(int argc, char *argv[]) {
 							}
 							else {
 								writeMessage(newfd, "RAU 0\n", 6);
+								puts("RAU 0");
 							}
 						}
 						else {
 							writeMessage(newfd, "RAU 0\n", 6);
+							puts("RAU 0");
 						}
 					}
 					else {

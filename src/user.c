@@ -191,8 +191,8 @@ int main(int argc, char *argv[]) {
 		else if(strcmp(command, "req") == 0 && logged) {
 			RID = rand() % 10000;
 
-			if(strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "L") == 0 || strcmp(arg1, "D") == 0 || strcmp(arg1, "X") == 0) {
-				if((strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0) && c == 3) {
+			if(strlen(arg1) == 1) {
+				if((strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0) && strlen(arg2) <= 25 && c == 3) {
 					sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
 					writeMessage(asfd, message, strlen(message));
 				}
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
 					writeMessage(asfd, message, strlen(message));
 				}
 				else {
-					puts(PROTOCOL_ERROR_MESSAGE);
+					puts(ERR_MESSAGE);
 					continue;
 				}
 
