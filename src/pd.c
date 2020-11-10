@@ -200,11 +200,14 @@ int main(int argc, char *argv[]) {
 					puts("Registered user successfully");
                 }
 				else {
+					reg = false;
+					break;
 					puts("Registration was not successful");
 				}
             }
 			else {
 				if(strcmp(command, "exit") == 0) {
+					puts("Closing PD");
 					break;
 				}
 				else {

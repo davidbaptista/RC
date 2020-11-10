@@ -162,7 +162,6 @@ int main(int argc, char *argv[]) {
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
-	struct timeval tv;
 
 	act.sa_handler = SIG_IGN;
 
@@ -180,18 +179,6 @@ int main(int argc, char *argv[]) {
 
 	if((pdfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("socket()");
-		exit(1);
-	}
-
-	tv.tv_sec = 10;
-	tv.tv_usec = 1; // 10 seconds I think
-	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-		perror("setsockopt()");
-		exit(1);
-	}
-
-	if (setsockopt(pdfd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0) {
-		perror("setsockopt()");
 		exit(1);
 	}
 
@@ -447,34 +434,15 @@ int main(int argc, char *argv[]) {
 
 					//user doesnt exist
 					if(!userExists(arg2)) {
-						sprintf(filename, "AS/USERS/remove_%s", arg2);
-
-						fp = fopen(filename, "r");
-
-						if(fp != NULL) {
-							if(remove(filename) != 0) {
-								perror("remove()");
-								exit(1);
-							}
-					
-							sendto(asudpfd, "RUN OK\n", 7, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
-							if(verbose) {
-								printf("RUN OK\n");
-							}
-						}
-						else {
-
-							sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
-							if(n < 0) {
-								perror("sendto()");
-								exit(1);
-							}
-
-							if(verbose) {
-								printf("RUN NOK\n");
-							}
+						sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+						if(n < 0) {
+							perror("sendto()");
+							exit(1);
 						}
 
+						if(verbose) {
+							printf("RUN NOK\n");
+						}
 					}
 					//user exists
 					else {
@@ -636,16 +604,6 @@ int main(int argc, char *argv[]) {
 									perror("rmdir()");
 									exit(1);
 								}
-
-								sprintf(filename, "AS/USERS/remove_%s", arg1);
-
-								fp = fopen(filename, "w");
-
-								if(fp == NULL) {
-									perror("fopen()");
-								}
-
-								fclose(fp);
 							}
 						}
 					}
@@ -854,8 +812,9 @@ int main(int argc, char *argv[]) {
 							sprintf(filename, "AS/USERS/%s/%s_reg.txt", arg1, arg1);
 								
 							if((fp = fopen(filename, "r")) == NULL){
-								perror("fopen()");
-								exit(1);
+								writeMessage(newfd, "RRQ EPD\n", 8);
+								puts("RRQ EPD");
+								continue;
 							}
 
 							n = fread(buffer, 1, BUFFER_SIZE, fp);
