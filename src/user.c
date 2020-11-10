@@ -173,6 +173,10 @@ int main(int argc, char *argv[]) {
 		c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
 		if(strcmp(command, "login") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
+			if(logged){
+				puts("You are already logged in!");
+				continue;
+			}
 			sprintf(message, "LOG %s %s\n", arg1, arg2);
 
 			writeMessage(asfd, message, strlen(message));

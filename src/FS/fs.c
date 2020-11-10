@@ -15,6 +15,7 @@
 #include <dirent.h>
 
 #pragma GCC diagnostic ignored "-Wformat-overflow"
+#pragma GCC diagnostic ignored "-Wformat-security"
 
 #define DEFAULT_AS_PORT "58002"
 #define DEFAULT_FS_PORT "59002"
