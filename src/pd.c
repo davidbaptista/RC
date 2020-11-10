@@ -117,7 +117,6 @@ int main(int argc, char *argv[]) {
 			n = recvfrom(pdfd, buffer, 128, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 			buffer[n]= '\0';
 
-
 			char Fop[2];
 			char FName[25];
             c = sscanf(buffer, "%s %s %s %s %s", command, arg1, arg2, Fop, FName);
@@ -138,6 +137,7 @@ int main(int argc, char *argv[]) {
 			
             n = sendto(pdfd, msg, strlen(msg), 0, (struct sockaddr*)&pdaddr, pdaddrlen);
             if(n == -1) {
+				perror("sendto()");
                 exit(1);
             }
         }

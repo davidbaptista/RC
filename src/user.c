@@ -310,6 +310,10 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 		}
 		else if((strcmp(command, "retrieve") == 0 || strcmp(command, "r") == 0) && logged) {
+				if(strcmp(arg1, Fname) != 0) {
+				puts("File differs from request file");
+				continue;
+			}
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -412,6 +416,11 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 		}
 		else if((strcmp(command, "upload") == 0 || strcmp(command, "u") == 0) && logged) {
+			if(strcmp(arg1, Fname) != 0) {
+				puts("File differs from request file");
+				continue;
+			}
+
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
@@ -435,7 +444,6 @@ int main(int argc, char *argv[]) {
 				fseek(fp, 0, SEEK_SET);
 				sprintf(message, "%ld ", size);
 				writeMessage(fsfd, message, strlen(message));
-				puts(message);
 				long nbytes = 0;
 				
 				while(nbytes < size) {
@@ -469,6 +477,11 @@ int main(int argc, char *argv[]) {
 			close(fsfd);
 		}
 		else if((strcmp(command, "delete") == 0 || strcmp(command, "d") == 0) && logged) {
+			if(strcmp(arg1, Fname) != 0) {
+				puts("File differs from request file");
+				continue;
+			}
+
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
 
 			n = connect(fsfd, fsres->ai_addr, fsres->ai_addrlen);
