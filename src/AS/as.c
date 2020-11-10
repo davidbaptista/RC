@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
-
+	struct timeval tv;
 	act.sa_handler = SIG_IGN;
 
 	parseArgs(argc, argv);
@@ -179,6 +179,13 @@ int main(int argc, char *argv[]) {
 
 	if((pdfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("socket()");
+		exit(1);
+	}
+
+	tv.tv_sec = 4;
+	tv.tv_usec = 1;
+	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+		perror("setsockopt()");
 		exit(1);
 	}
 
@@ -830,8 +837,9 @@ int main(int argc, char *argv[]) {
 							sscanf(buffer, "%s %s", pdIP, pdPort);
 
 							if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
-								perror("getaddrinfo()");
-								exit(1);
+								writeMessage(newfd, "RRQ EPD\n", 8);
+								puts("RRQ EPD");
+								continue;
 							}
 
 							VC = rand() % 10000;
@@ -851,21 +859,17 @@ int main(int argc, char *argv[]) {
 
 							printf(buffer);
 						
-							if(n < 0) {
-								writeMessage(newfd, "RRQ EPD\n", 8);
-								puts("RRQ EPD");
-								freeaddrinfo(pdres);
-								continue;
+							if(n == -1) {
+								perror("recvfrom()");
+								exit(1);
 							}
 
 							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 							buffer[n]= '\0';
 
-							if(n < 0) {
-								writeMessage(newfd, "RRQ EPD\n", 8);
-								puts("RRQ EPD");
-								freeaddrinfo(pdres);
-								continue;
+							if(n == -1) {
+								n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
+								buffer[n]= '\0';
 							}
 
 							printf(buffer);
@@ -891,7 +895,7 @@ int main(int argc, char *argv[]) {
 						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3);
 
 						if(verbose) {
-							//printf(buffer);
+							printf(buffer);
 						}
 
 						potentialVC = strtol(arg3, NULL, 10);
