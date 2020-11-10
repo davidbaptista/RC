@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
 			else {
                 strcpy(msg,"RVC NOK\n");
             }
-            
+			
             n = sendto(pdfd, msg, strlen(msg), 0, (struct sockaddr*)&pdaddr, pdaddrlen);
             if(n == -1) {
                 exit(1);
@@ -167,13 +167,14 @@ int main(int argc, char *argv[]) {
                     if(!strcmp(buffer, "RUN OK\n")) {
                         reg = false;
 						puts("Unregister was successful");
+						break;
                     }
 					else {
 						puts("Unregister was not successful");
 					}
                 }
 				else {
-					puts("User is already unregistered. Nothing was done");
+					break;
 				}
             }
             else if (c == 3 && strcmp(command, "reg") == 0 && strlen(arg1) == 5 && strlen(arg2) == 8) {
@@ -204,7 +205,7 @@ int main(int argc, char *argv[]) {
             }
 			else {
 				if(strcmp(command, "exit") == 0) {
-					puts("User is already unregistered. Nothing was done");
+					break;
 				}
 				else {
 					puts(PROTOCOL_ERROR_MESSAGE);

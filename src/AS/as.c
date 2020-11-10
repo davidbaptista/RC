@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	tv.tv_sec = 10;
-	tv.tv_usec = 0; // 10 seconds I think
+	tv.tv_usec = 1; // 10 seconds I think
 	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
 		perror("setsockopt()");
 		exit(1);
@@ -447,15 +447,34 @@ int main(int argc, char *argv[]) {
 
 					//user doesnt exist
 					if(!userExists(arg2)) {
-						sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
-						if(n < 0) {
-							perror("sendto()");
-							exit(1);
+						sprintf(filename, "AS/USERS/remove_%s", arg2);
+
+						fp = fopen(filename, "r");
+
+						if(fp != NULL) {
+							if(remove(filename) != 0) {
+								perror("remove()");
+								exit(1);
+							}
+					
+							sendto(asudpfd, "RUN OK\n", 7, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+							if(verbose) {
+								printf("RUN OK\n");
+							}
+						}
+						else {
+
+							sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
+							if(n < 0) {
+								perror("sendto()");
+								exit(1);
+							}
+
+							if(verbose) {
+								printf("RUN NOK\n");
+							}
 						}
 
-						if(verbose) {
-							printf("RUN NOK\n");
-						}
 					}
 					//user exists
 					else {
@@ -617,6 +636,16 @@ int main(int argc, char *argv[]) {
 									perror("rmdir()");
 									exit(1);
 								}
+
+								sprintf(filename, "AS/USERS/remove_%s", arg1);
+
+								fp = fopen(filename, "w");
+
+								if(fp == NULL) {
+									perror("fopen()");
+								}
+
+								fclose(fp);
 							}
 						}
 					}
@@ -860,10 +889,13 @@ int main(int argc, char *argv[]) {
 							strcpy(Fop, arg3);
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
+
+							printf(buffer);
 						
 							if(n < 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
 								puts("RRQ EPD");
+								freeaddrinfo(pdres);
 								continue;
 							}
 
@@ -873,8 +905,11 @@ int main(int argc, char *argv[]) {
 							if(n < 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
 								puts("RRQ EPD");
+								freeaddrinfo(pdres);
 								continue;
 							}
+
+							printf(buffer);
 
 							sscanf(buffer, "RVC %s %s", arg1, arg2);
 							if(strcmp(arg2, "OK") == 0){

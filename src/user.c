@@ -514,6 +514,8 @@ int main(int argc, char *argv[]) {
 
 			if(strcmp(message, "RRM OK\n") == 0){
 				puts("Operation succeeded");
+				logged = false;
+				cycle = false;
 			}
 			else if(strcmp(message, "RRM NOK\n") == 0){
 				puts(NOK_MESSAGE);
@@ -528,7 +530,6 @@ int main(int argc, char *argv[]) {
 		else if(strcmp(command, "exit") == 0) {
 			logged = false;
 			cycle = false;
-			exit(0);
 		}
 		else {
 			puts(PROTOCOL_ERROR_MESSAGE);

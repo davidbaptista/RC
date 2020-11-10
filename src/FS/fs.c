@@ -607,13 +607,13 @@ int main(int argc, char *argv[]) {
 							printf("RRM OK\n");
 						}
 						else {
-							writeMessage(newfd, "RRM ERR\n", (long) 8);
+							writeMessage(newfd, "RRM ERR\n", (long)8);
 							printf("RRM ERR\n");
 						}
 					}
 					else {
-						writeMessage(newfd, "RRM NOK\n", (long) 8);
-						printf("RRM NOK\n");
+						writeMessage(newfd, "RRM OK\n", (long)7);
+						printf("RRM OK\n");
 					}
 				}
 				else if(Fop == 'E') {
