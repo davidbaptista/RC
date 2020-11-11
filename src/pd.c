@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
     ssize_t n;
 	fd_set fds;	
     socklen_t asaddrlen, pdaddrlen;
+	struct timeval tv;
 
     parseArgs(argc, argv);
 
@@ -74,6 +75,14 @@ int main(int argc, char *argv[]) {
 
 	pdfd = socket(AF_INET, SOCK_DGRAM, 0); // server socket
 	if(pdfd == -1) {
+		exit(1);
+	}
+
+	// setting timeout for reading AS messages. At most the PD will wait 5 seconds for a reply
+	tv.tv_sec = 5;
+	tv.tv_usec = 0; 
+	if (setsockopt(asfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+		perror("setsockopt()");
 		exit(1);
 	}
 
@@ -94,6 +103,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	// binds so that the server socket can listen to UDP requests from the AS
 	if(bind(pdfd, pdres->ai_addr, pdres->ai_addrlen) == -1) {
         perror("bind()");
 		exit(1);
@@ -106,18 +116,20 @@ int main(int argc, char *argv[]) {
     	FD_SET(pdfd, &fds);
 		FD_SET(0, &fds);
 
-		// selects between user input in stdin and AS 
+		// selects between user input in stdin and AS messages
         counter = select(pdfd + 1, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
         if (counter <= 0) {
 			perror("select()");
             exit(1);
         }
 		
+		// deal with AS messages
         if(FD_ISSET(pdfd, &fds)){
 			pdaddrlen = sizeof(pdaddr);
 			n = recvfrom(pdfd, buffer, 128, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 			buffer[n]= '\0';
 
+			// extracting the validation codes for the registered user
 			char Fop[2];
 			char FName[25];
             c = sscanf(buffer, "%s %s %s %s %s", command, arg1, arg2, Fop, FName);
@@ -136,23 +148,26 @@ int main(int argc, char *argv[]) {
                 strcpy(msg,"RVC NOK\n");
             }
 			
+			// replying to the AS with the according status message
             n = sendto(pdfd, msg, strlen(msg), 0, (struct sockaddr*)&pdaddr, pdaddrlen);
             if(n == -1) {
 				perror("sendto()");
                 exit(1);
             }
         }
-        if(FD_ISSET(0, &fds)) { 
+        // deal with user input
+		if(FD_ISSET(0, &fds)) { 
             fgets(line, sizeof(line), stdin);
 
             c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
+			/* deal with an exit command. sends UNR message to AS if there is a logged in user, and closes the PD.*/
             if(c == 1 && strlen(UID) == 5 && strlen(pass) == 8 && strcmp(command, "exit") == 0) {
                 if(reg) {
                     sprintf(msg, "UNR %s %s\n", UID, pass);
 
                     n = sendto(asfd, msg, strlen(msg), 0, asres->ai_addr, asres->ai_addrlen);
-                    if(n == -1) {
+                    if(n <= -0) {
 						perror("sendto()");
                         exit(1);
                     }
@@ -161,7 +176,7 @@ int main(int argc, char *argv[]) {
                     n = recvfrom(asfd, buffer, 128, 0, (struct sockaddr*)&asaddr, &asaddrlen);
                     buffer[n] = '\0';
 
-                    if(n == -1) {
+                    if(n <= 0) {
 						perror("recvfrom()");
                         exit(1);
                     }
@@ -169,18 +184,19 @@ int main(int argc, char *argv[]) {
                     if(!strcmp(buffer, "RUN OK\n")) {
                         reg = false;
 						puts("Unregister was successful");
-						break;
                     }
 					else {
 						reg = false;
 						puts("There was no user folder in the AS. Closing PD");
-						break;
 					}
+					break;
                 }
 				else {
+					puts("There was registered user. Closing PD");
 					break;
 				}
             }
+			/* handles user register. registers a user for the first time (or a new user if already registered) */
             else if (c == 3 && strcmp(command, "reg") == 0 && strlen(arg1) == 5 && strlen(arg2) == 8) {
                 sprintf(msg, "REG %s %s %s %s\n", arg1, arg2, pdIP, pdPort);
 
@@ -210,6 +226,7 @@ int main(int argc, char *argv[]) {
 					puts("Registration was not successful");
 				}
             }
+			// if the PD did not have a registered user or receives a poorly formatted answer. Also accepts poorly formatted exits
 			else {
 				if(strcmp(command, "exit") == 0) {
 					puts("There was no user folder in the AS. Closing PD");
@@ -222,6 +239,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+
+	// frees and closes
     freeaddrinfo(asres);
 	freeaddrinfo(pdres);
     close(asfd);
