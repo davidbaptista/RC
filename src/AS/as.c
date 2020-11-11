@@ -162,7 +162,6 @@ int main(int argc, char *argv[]) {
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
-	struct timeval tv;
 	act.sa_handler = SIG_IGN;
 
 	parseArgs(argc, argv);
@@ -182,13 +181,6 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	tv.tv_sec = 1;
-	tv.tv_usec = 1;
-	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-		perror("setsockopt()");
-		exit(1);
-	}
-
 	if((astcpfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		perror("socket()");
 		exit(1);
@@ -202,6 +194,7 @@ int main(int argc, char *argv[]) {
 	memset(&pdhints, 0, sizeof(pdhints));
     pdhints.ai_family=AF_INET;
     pdhints.ai_socktype=SOCK_DGRAM; 
+	pdhints.ai_flags = AI_PASSIVE;
 
 	memset(&astcphints, 0, sizeof(astcphints));
     astcphints.ai_family=AF_INET;
@@ -313,7 +306,7 @@ int main(int argc, char *argv[]) {
 
 							fp = fopen(filename, "r");
 
-							//first time user registration
+							// primeiro registo
 							if(fp == NULL) {
 								fp = fopen(filename, "w");
 
@@ -867,15 +860,10 @@ int main(int argc, char *argv[]) {
 							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 							buffer[n]= '\0';
 
-							if(n == -1) {
-								n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
-								buffer[n]= '\0';
-							}
-
 							printf(buffer);
 
 							sscanf(buffer, "RVC %s %s", arg1, arg2);
-							if(strcmp(arg2, "OK") == 0){
+							if(strcmp(arg2, "OK") == 0) {
 								writeMessage(newfd, "RRQ OK\n", 7);
 								printf("RRQ OK\n");
 							}
