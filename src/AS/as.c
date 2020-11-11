@@ -833,8 +833,6 @@ int main(int argc, char *argv[]) {
 							char pdPort[8];
 							sscanf(buffer, "%s %s", pdIP, pdPort);
 
-							puts(buffer);
-
 							if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
 								puts("RRQ EPD");
