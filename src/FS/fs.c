@@ -512,7 +512,6 @@ int main(int argc, char *argv[]) {
 					// checks if the folder has space or if the file is duplicated
 					while((dir = readdir(d)) != NULL) {
 						if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
-							i--;
 							continue;
 						}
 						if(strcmp(dir->d_name, FName) == 0){
