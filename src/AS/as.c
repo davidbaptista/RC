@@ -303,10 +303,6 @@ int main(int argc, char *argv[]) {
 
 						if(!valid) {
 							sendto(asudpfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
-
-							if(verbose) {
-								printf("RRG NOK\n");
-							}
 							continue;
 						}
 
@@ -355,10 +351,6 @@ int main(int argc, char *argv[]) {
 									exit(1);
 								}
 
-								if(verbose) {
-									printf("RRG OK\n");
-								}
-
 								if(fclose(fp) != 0) {
 									perror("fclose()");
 									exit(1);
@@ -382,10 +374,6 @@ int main(int argc, char *argv[]) {
 										perror("sendto()");
 										exit(1);
 									}
-
-									if(verbose) {
-										printf("RRG OK\n");
-									}
 								}
 								else {
 									n = sendto(asudpfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
@@ -393,10 +381,6 @@ int main(int argc, char *argv[]) {
 									if(n == -1) {
 										perror("sendto()");
 										exit(1);
-									}
-
-									if(verbose) {
-										printf("RRG NOK\n");
 									}
 								}
 							}
@@ -441,12 +425,7 @@ int main(int argc, char *argv[]) {
 						perror("sendto()");
 						exit(1);
 					}
-
-					if(verbose) {
-						printf("RRG ERR\n");
-					}
 				}
-
 			}
 			else if(strcmp(arg1, "UNR") == 0) {
 				n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
@@ -460,10 +439,6 @@ int main(int argc, char *argv[]) {
 						if(n < 0) {
 							perror("sendto()");
 							exit(1);
-						}
-
-						if(verbose) {
-							printf("RUN NOK\n");
 						}
 					}
 					//user exists
@@ -501,10 +476,6 @@ int main(int argc, char *argv[]) {
 									perror("sendto()");
 									exit(1);
 								}
-
-								if(verbose) {
-									printf("RUN OK\n");
-								}
 							}
 							else {
 								sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
@@ -512,10 +483,6 @@ int main(int argc, char *argv[]) {
 								if(n < 0) {
 									perror("sendto()");
 									exit(1);
-								}
-
-								if(verbose) {
-									printf("RUN NOK\n");
 								}
 							}
 						}
@@ -527,10 +494,6 @@ int main(int argc, char *argv[]) {
 								perror("sendto()");
 								exit(1);
 							}
-
-							if(verbose) {
-								printf("RUN NOK\n");
-							}
 						}
 					}
 				}
@@ -540,10 +503,6 @@ int main(int argc, char *argv[]) {
 					if(n < 0) {
 						perror("sendto()");
 						exit(1);
-					}
-
-					if(verbose) {
-						puts("RUN ERR\n");
 					}
 				}
 			}
@@ -559,10 +518,6 @@ int main(int argc, char *argv[]) {
 						sprintf(buffer, "CNF %s %s E\n", arg1, arg2);
 
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
-
-						if(verbose) {
-							//printf(buffer);
-						}
 
 						if(n < 0) {
 							perror("sendto()");
@@ -639,10 +594,6 @@ int main(int argc, char *argv[]) {
 						perror("sendto()");
 						exit(1);
 					}
-
-					if(verbose) {
-						//printf(buffer);
-					}
 				}
 			}
 			else {
@@ -651,11 +602,7 @@ int main(int argc, char *argv[]) {
 				if(n < 0) {
 					perror("sendto()");
 					exit(1);
-				}
-
-				if(verbose) {
-					printf("ERR\n");
-				}		
+				}	
 			}
 		}
 		if(FD_ISSET(astcpfd, &fds)) {
@@ -781,11 +728,9 @@ int main(int argc, char *argv[]) {
 							}
 
 							writeMessage(newfd, "RLO OK\n", 7);
-							printf("RLO OK\n");
 						}
 						else {
 							writeMessage(newfd, "RLO NOK\n", 8);
-							printf("RLO NOK\n");
 						}
 					}
 					else if(strcmp(arg1, "REQ") == 0) {
@@ -793,26 +738,22 @@ int main(int argc, char *argv[]) {
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
 							writeMessage(newfd, "RRQ ERR\n", 8);
-							printf("RRQ ERR\n");
 							continue;
 						}
 
 						if(userExists(arg1) != true) {
 							writeMessage(newfd, "RRQ EUSER\n", 10);
-							printf("RRQ EUSER\n");
 							continue;
 						}
 
 						if(userIsLoggedIn(arg1) != true || strcmp(UID, arg1) != 0) {
 							writeMessage(newfd, "RRQ ELOG\n", 9);
-							printf("RRQ ELOG\n");
 							continue;
 						}
 
 						if((strcmp(arg3, "R") == 0 || strcmp(arg3, "U") == 0 || strcmp(arg3, "D") == 0) && ret == 4) {
 							if(strlen(arg4) > 24) {
 								writeMessage(newfd, "RRQ ERR\n", 8);
-								printf("RRQ ERR\n");
 								continue;							
 							}
 						}
@@ -826,7 +767,6 @@ int main(int argc, char *argv[]) {
 								}
 								else {
 									writeMessage(newfd, "RRQ ERR\n", 8);
-									printf("RRQ ERR\n");
 									continue;
 								}
 							}
@@ -835,7 +775,6 @@ int main(int argc, char *argv[]) {
 							}
 							else {
 								writeMessage(newfd, "RRQ ERR\n", 8);
-								printf("RRQ ERR\n");
 								continue;
 							}
 
@@ -861,7 +800,6 @@ int main(int argc, char *argv[]) {
 								
 							if((fp = fopen(filename, "r")) == NULL){
 								writeMessage(newfd, "RRQ EPD\n", 8);
-								puts("RRQ EPD");
 								continue;
 							}
 
@@ -879,7 +817,6 @@ int main(int argc, char *argv[]) {
 
 							if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
-								puts("RRQ EPD");
 								continue;
 							}
 
@@ -912,29 +849,20 @@ int main(int argc, char *argv[]) {
 								continue;
 							}
 
-							printf(buffer);
-
 							sscanf(buffer, "RVC %s %s", arg1, arg2);
 							if(strcmp(arg2, "OK") == 0) {
 								writeMessage(newfd, "RRQ OK\n", 7);
-								printf("RRQ OK\n");
 							}
 							else {
 								writeMessage(newfd, "RRQ EUSER\n", 10);
-								printf("RRQ EUSER\n");
 							}
 						}
 						else {
 							writeMessage(newfd, "RRQ EFOP\n", 9);
-							printf("RRQ EFOP\n");
 						}
 					}
 					else if(strcmp(arg1, "AUT") == 0) {
 						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3);
-
-						if(verbose) {
-							printf(buffer);
-						}
 
 						potentialVC = strtol(arg3, NULL, 10);
 
@@ -975,17 +903,14 @@ int main(int argc, char *argv[]) {
 							}
 							else {
 								writeMessage(newfd, "RAU 0\n", 6);
-								puts("RAU 0");
 							}
 						}
 						else {
 							writeMessage(newfd, "RAU 0\n", 6);
-							puts("RAU 0");
 						}
 					}
 					else {
 						writeMessage(newfd, "ERR\n", 4);
-						printf("ERR\n");
 					}
 				}
 
