@@ -171,6 +171,7 @@ int main(int argc, char *argv[]) {
 
 	parseArgs(argc, argv);
 
+	/* Avoid zombies when child processes die. */
 	if(sigaction(SIGCHLD, &act, NULL) == -1) {
 		perror("sigaction()");
 		exit(1);
@@ -186,6 +187,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	// setting timeout for reading PD messages. At most the AS will wait 2 seconds for a reply
 	tv.tv_sec = 2;
 	tv.tv_usec = 0; 
 	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
@@ -222,16 +224,19 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	// bind so the server socket can listen to UDP requests from the PD's and FS
 	if(bind(asudpfd, asudpres->ai_addr, asudpres->ai_addrlen) == -1) {
 		perror("bind()");
 		exit(1);
 	}
 
+	// bind so the server socket can listen to TCP requests from the Users
 	if(bind(astcpfd, astcpres->ai_addr, astcpres->ai_addrlen) == -1) {
 		perror("bind()");
 		exit(1);
 	}
 
+	// maximum length of 128 for the queue of pending User TCP connections
 	if(listen(astcpfd, 128) == -1) {
 		perror("listen()");
 		exit(1);
@@ -243,16 +248,18 @@ int main(int argc, char *argv[]) {
 		FD_SET(astcpfd, &fds);
 		FD_SET(0, &fds);
 
+		// selects between messages from stdin, PD and FD (UDP), and Users (TCP)
 		counter = select(max(asudpfd, astcpfd) + 1, &fds, (fd_set *)NULL, (fd_set *)NULL, (struct timeval *)NULL);
  		if(counter <= 0) {
             exit(1);
         }
 
+		// deal with PD and FD (UDP) messages
 		if(FD_ISSET(asudpfd, &fds)) {
 			asudpaddrlen = sizeof(asudpaddr);
 			n = recvfrom(asudpfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asudpaddr, &asudpaddrlen);
 
-			//get the IP and Port
+			//get the client's IP and Port 
 			strcpy(sockIP, inet_ntoa(asudpaddr.sin_addr));
 			sockPort = ntohs(asudpaddr.sin_port);
 
@@ -278,7 +285,7 @@ int main(int argc, char *argv[]) {
 			}
 
 			if(strcmp(arg1, "REG") == 0) {
-				n = sscanf(buffer, "%s %s %s %s %s", arg1, arg2, arg3, arg4, arg5);
+				n = sscanf(buffer, "%s %s %s %s %s", arg1, arg2, arg3, arg4, arg5); // REG UID pass PDIP PDport
 
 				if(n == 5) {
 					if(strlen(arg2) == 5 && strlen(arg3) == 8) {
@@ -295,7 +302,7 @@ int main(int argc, char *argv[]) {
 
 						c = arg3;
 						while(*c) {
-							if(isalnum(*c++) == 0) {
+							if(isalnum(*c++) == 0) { //alphanumeric
 								valid = false;
 								break;
 							}
@@ -310,6 +317,7 @@ int main(int argc, char *argv[]) {
 
 						d = opendir(dirname);
 
+						// if directory doesn't exist, create the directory
 						if(!d) {
 							if(mkdir(dirname, 0777) != 0) {
 								perror("mkdir()");
@@ -324,7 +332,7 @@ int main(int argc, char *argv[]) {
 
 							fp = fopen(filename, "r");
 
-							// primeiro registo
+							// The password file doesn't exist, therefore it's the first registration
 							if(fp == NULL) {
 								fp = fopen(filename, "w");
 
@@ -356,7 +364,7 @@ int main(int argc, char *argv[]) {
 									exit(1);
 								}
 							}
-							//user already registrated
+							// user already registrated
 							else {
 								n = fread(buffer, 1, BUFFER_SIZE, fp);
 								buffer[n] = '\0';
@@ -393,7 +401,7 @@ int main(int argc, char *argv[]) {
 								exit(1);
 							}
 
-							sprintf(buffer, "%s %s", arg4, arg5);
+							sprintf(buffer, "%s %s", arg4, arg5); // PDIP PDport
 
 							n = fwrite(buffer, 1, strlen(buffer), fp);
 
@@ -417,6 +425,12 @@ int main(int argc, char *argv[]) {
 							exit(1);
 						}					
 					}
+					else {
+						if(sendto(asudpfd, "RRG NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen) < 0) {
+							perror("sendto()");
+							exit(1);
+						}
+					}
 				}
 				else {
 					n = sendto(asudpfd, "RRG ERR\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
@@ -428,7 +442,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else if(strcmp(arg1, "UNR") == 0) {
-				n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3);
+				n = sscanf(buffer, "%s %s %s", arg1, arg2, arg3); // UNR UID pass
 
 				if(n == 3) {
 					sprintf(dirname, "AS/USERS/%s", arg2);
@@ -466,6 +480,7 @@ int main(int argc, char *argv[]) {
 
 							sprintf(buffer, "%s/%s_reg.txt", dirname, arg2);
 							if(remove(buffer) != 0) {
+								// Make sure the fiel exists
 								ok = false;
 							}			
 
@@ -486,7 +501,7 @@ int main(int argc, char *argv[]) {
 								}
 							}
 						}
-						//wrong pass
+						//wrong password
 						else{
 							sendto(asudpfd, "RUN NOK\n", 8, 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
@@ -507,15 +522,17 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else if(strcmp(arg1, "VLD") == 0) {
-				n = sscanf(buffer, "VLD %s %s", arg1, arg2);
+				n = sscanf(buffer, "VLD %s %s", arg1, arg2); // VLD UID TID
 
+				// Argument validation
 				if(n == 2 && strlen(arg1) == 5 && strlen(arg2) == 4  && userExists(arg1) && userIsLoggedIn(arg1)) {
 					sprintf(filename, "AS/USERS/%s/%s_tid.txt", arg1, arg1);
 
 					fp = fopen(filename, "r");
 
+					// No TID file
 					if(fp == NULL) {
-						sprintf(buffer, "CNF %s %s E\n", arg1, arg2);
+						sprintf(buffer, "CNF %s %s E\n", arg1, arg2); // CNF UID TID E
 
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
@@ -540,7 +557,7 @@ int main(int argc, char *argv[]) {
 							exit(1);
 						}
 
-						sprintf(buffer, "CNF %s %s %s\n", arg1, arg2, aux);
+						sprintf(buffer, "CNF %s %s %s\n", arg1, arg2, aux); // CNF UID TID Fop [Fname] 
 
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 
@@ -561,6 +578,7 @@ int main(int argc, char *argv[]) {
 								exit(1);
 							}
 
+							// delete all user's files
 							while((dir = readdir(d)) != NULL) {
 								if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
 									continue;
@@ -585,7 +603,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 					else {
-						sprintf(buffer, "CNF %s %s E\n", arg1, arg2);
+						sprintf(buffer, "CNF %s %s E\n", arg1, arg2); // CNF UID TID E
 
 						n = sendto(asudpfd, buffer, strlen(buffer), 0, (struct sockaddr*)&asudpaddr, asudpaddrlen);
 					}
@@ -605,6 +623,8 @@ int main(int argc, char *argv[]) {
 				}	
 			}
 		}
+		
+		// deal with User (TCP) messages
 		if(FD_ISSET(astcpfd, &fds)) {
 			astcpaddrlen = sizeof(astcpaddrlen);
 
@@ -621,6 +641,7 @@ int main(int argc, char *argv[]) {
 				perror("fork()");
 				exit(1);
 			}
+			// child proccess
 			else if(pid == 0) {
 				close(astcpfd);
 
@@ -636,6 +657,7 @@ int main(int argc, char *argv[]) {
 				struct sockaddr_in addr;
 				socklen_t addrsize = sizeof(struct sockaddr_in);
 
+				// get the client's IP and Port 
 				if(getpeername(newfd, (struct sockaddr*)&addr, &addrsize) != 0) {
 					perror("getpeername()");
 					exit(1);
@@ -663,8 +685,9 @@ int main(int argc, char *argv[]) {
 					sscanf(buffer, "%s ", arg1);
 					
 					if(strcmp(arg1, "LOG") == 0) {
-						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
+						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3); // LOG UID pass
 
+						// Argument validation
 						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
 							writeMessage(newfd, "RLO ERR\n", 8);
 							continue;
@@ -734,7 +757,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 					else if(strcmp(arg1, "REQ") == 0) {
-						ret = sscanf(buffer, "REQ %s %s %s %s", arg1, arg2, arg3, arg4);
+						ret = sscanf(buffer, "REQ %s %s %s %s", arg1, arg2, arg3, arg4); // REQ UID RID Fop [Fname]
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
 							writeMessage(newfd, "RRQ ERR\n", 8);
@@ -824,16 +847,17 @@ int main(int argc, char *argv[]) {
 							strcpy(RID, arg2);
 
 							if(hasFname) {
-								sprintf(buffer, "VLC %s %04d %s %s\n", arg1, VC, arg3, arg4);
+								sprintf(buffer, "VLC %s %04d %s %s\n", arg1, VC, arg3, arg4); // VLC UID VC Fop [Fname]
 								strcpy(FName, arg4);
 							}
 							else {
-								sprintf(buffer, "VLC %s %04d %s\n", arg1, VC, arg3);
+								sprintf(buffer, "VLC %s %04d %s\n", arg1, VC, arg3); // VLC UID VC Fop
 							}
 
 							strcpy(Fop, arg3);
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
+							printf(buffer);
 
 							if(n <= 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
@@ -848,7 +872,8 @@ int main(int argc, char *argv[]) {
 								continue;
 							}
 
-							sscanf(buffer, "RVC %s %s", arg1, arg2);
+							sscanf(buffer, "RVC %s %s", arg1, arg2); // RVC UID status
+
 							if(strcmp(arg2, "OK") == 0) {
 								writeMessage(newfd, "RRQ OK\n", 7);
 							}
@@ -861,7 +886,7 @@ int main(int argc, char *argv[]) {
 						}
 					}
 					else if(strcmp(arg1, "AUT") == 0) {
-						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3);
+						ret = sscanf(buffer, "AUT %s %s %s\n", arg1, arg2, arg3); // AUT UID RID VC
 
 						potentialVC = strtol(arg3, NULL, 10);
 
@@ -925,6 +950,8 @@ int main(int argc, char *argv[]) {
 				exit(1);
 			}
 		}
+
+		// Deal with the stdin user input (exit)
 		if(FD_ISSET(0, &fds)) {
             fgets(buffer, sizeof(buffer), stdin);
 			buffer[4] = '\0';
