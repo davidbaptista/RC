@@ -36,7 +36,7 @@ char *asPort = NULL;
 char *fsIP = NULL;
 char *fsPort = NULL;
 
-
+//  argument parsing function
 void parseArgs(long argc, char* const argv[]) {
 	char c;
 
@@ -63,6 +63,7 @@ void parseArgs(long argc, char* const argv[]) {
     }
 }
 
+// writes the message to a given TCP socket and returns the total number of bytes written
 long writeMessage(int fd, char *msg, long int msgSize) {
 	ssize_t nleft, nwritten, ntotal = 0;
 	char *ptr;
@@ -83,6 +84,7 @@ long writeMessage(int fd, char *msg, long int msgSize) {
 	return ntotal;
 } 
 
+// reads the message from a given TCP socket and returns the total number of bytes read
 long readMessage(int fd, char *msg) {
 	ssize_t nleft, nread, ntotal = 0;
 	char *ptr;
@@ -127,7 +129,7 @@ int main(int argc, char *argv[]) {
 	char arg1[128], arg2[128];
 	int c;
 
-	bool logged = false;
+	bool logged = false;	// controls whether or not there is a logged user
 	bool cycle = true;
 
 	//command vars
@@ -168,11 +170,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	while(cycle) {
+		// reads user input from stdin and extracts it
 		fgets(line, sizeof(line), stdin);
-
 		c = sscanf(line, "%s %s %s", command, arg1, arg2);
 
 		if(strcmp(command, "login") == 0 && c == 3 && strlen(arg1) == 5 && strlen(arg2) == 8) {
+			// prevents the user from doing several logins
 			if(logged) {
 				puts("You are already logged in!");
 				continue;
@@ -182,6 +185,7 @@ int main(int argc, char *argv[]) {
 			writeMessage(asfd, message, strlen(message));
 			readMessage(asfd, message);
 
+			// AS accepted login. Setting correct variable values for future commands
 			if(strcmp(message, "RLO OK\n")==0) {
 				strcpy(UID, arg1);
 				strcpy(pass, arg2);
@@ -196,6 +200,7 @@ int main(int argc, char *argv[]) {
 			RID = rand() % 10000;
 
 			if(strlen(arg1) == 1) {
+				// extracts input accordingly by checking if the given Fop requires a file name
 				if((strcmp(arg1, "R") == 0 || strcmp(arg1, "U") == 0 || strcmp(arg1, "D") == 0) && strlen(arg2) <= 25 && c == 3) {
 					sprintf(message, "REQ %s %04d %s %s\n", UID, RID, arg1, arg2);
 					writeMessage(asfd, message, strlen(message));
@@ -210,11 +215,11 @@ int main(int argc, char *argv[]) {
 				}
 
 				readMessage(asfd, message);
-
+				
 				if(strcmp(message, "RRQ OK\n") == 0) {
 					Fop = arg1[0];
 					if((Fop == 'R' || Fop == 'U' || Fop == 'D') && c == 3) {
-						strcpy(Fname, arg2);
+						strcpy(Fname, arg2); // REQ went okay, setting variable value for future commands
 					}
 				}
 				else if(strcmp(message, "RRQ ELOG\n") == 0) {
@@ -238,6 +243,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		else if(strcmp(command, "val") == 0 && logged) {
+			// checks if a REQ was previously done
 			if(RID == -1) {
 				puts("No request has been made");
 				continue;
@@ -248,6 +254,7 @@ int main(int argc, char *argv[]) {
 			readMessage(asfd, message);
 			ret = sscanf(message, "%s %s", arg1, arg2);
 
+			// checks if the AS accepted the validation codes
 			if(ret == 2 && strcmp(arg2, "0") != 0){
 				strcpy(TID, arg2);
 				printf("Authenticated! (TID=%s)\n", TID);		
@@ -287,12 +294,14 @@ int main(int argc, char *argv[]) {
 				i = 1;
 				int nfiles;
 				char *p;
+				
+				// reads the number of files sent to list 
 				p = strtok(message, " ");
 				p = strtok(NULL, " ");
 				nfiles = strtol(p, NULL, 10);
 				p = strtok(NULL, " ");
 
-
+				// reads file size and then file name for each pair of file size and name
 				for(; p != NULL; p = strtok(NULL, " ")) {
 					printf("%d - ", i);
 					printf("%s ", p);
@@ -327,6 +336,7 @@ int main(int argc, char *argv[]) {
 			ssize_t nleft = 7, nread, ntotal = 0;
 			char *ptr = message;
 
+			//  
 			while(nleft > 0) {
 				nread = read(fsfd, ptr, nleft);
 
@@ -353,6 +363,7 @@ int main(int argc, char *argv[]) {
 				ntotal = 0;
 				nleft = 11;
 
+				// reads one by one bytes to find file size
 				while(1) {
 					nread = read(fsfd, ptr, 1);
 
@@ -365,8 +376,6 @@ int main(int argc, char *argv[]) {
 					nleft -= nread;
 					ntotal += nread;
 
-					// le ate encontrar o espaco (ou seja ja leu os digitos todos do numero)
-					// TODO: validar o numero de digitos
 					if(ptr[nread-1] == ' ') {
 						break;
 					}
@@ -380,10 +389,13 @@ int main(int argc, char *argv[]) {
 
 				FILE *fp = fopen(Fname, "wb");
 
+				// reads the file bytes until they reach or exceed file size
 				while(nbytes < size) {
 					nread = read(fsfd, message, MESSAGE_SIZE);
 					nbytes += nread;
 
+					/*if the socket read too much (or read"trash"), adjusts nread value so only 
+					the correct number of bytes is written to local file copy */
 					if(nbytes >= size) {
 						nread -= (nbytes - size);
 					}
@@ -438,14 +450,18 @@ int main(int argc, char *argv[]) {
 			}
 			else {
 				writeMessage(fsfd, message, strlen(message));
-				puts(message);
+				
+				// finds file size
 				fseek(fp, 0, SEEK_END);
 				long size = ftell(fp);
 				fseek(fp, 0, SEEK_SET);
 				sprintf(message, "%ld ", size);
+
+				// 
 				writeMessage(fsfd, message, strlen(message));
 				long nbytes = 0;
 				
+				// reads until the number of bytes read exceeds file size
 				while(nbytes < size) {
 					n = fread(message, 1, MESSAGE_SIZE, fp);
 					nbytes += writeMessage(fsfd, message, n);
@@ -510,7 +526,6 @@ int main(int argc, char *argv[]) {
 			}
 
 			close(fsfd);
-
 		}
 		else if((strcmp(command, "remove") == 0 || strcmp(command,"x") == 0) && logged) {
 			fsfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -549,6 +564,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	// frees and closes
     freeaddrinfo(asres);
 	freeaddrinfo(fsres);
 	close(asfd);
