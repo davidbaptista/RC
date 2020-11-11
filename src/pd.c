@@ -209,7 +209,6 @@ int main(int argc, char *argv[]) {
 				else {
 					reg = false;
 					puts("Registration was not successful");
-                    break;
 				}
             }
 			else {
