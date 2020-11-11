@@ -149,6 +149,8 @@ int main(int argc, char *argv[]) {
 
     parseArgs(argc, argv);
 
+	memset(&act, 0, sizeof(act));
+
 	if(sigaction(SIGCHLD, &act, NULL) == -1) {
 		perror("sigaction()");
 		exit(1);

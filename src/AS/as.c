@@ -162,6 +162,9 @@ int main(int argc, char *argv[]) {
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
+	struct timeval tv;
+
+	memset(&act, 0, sizeof(act));
 	act.sa_handler = SIG_IGN;
 
 	parseArgs(argc, argv);
@@ -178,6 +181,13 @@ int main(int argc, char *argv[]) {
 
 	if((pdfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		perror("socket()");
+		exit(1);
+	}
+
+	tv.tv_sec = 2;
+	tv.tv_usec = 0; 
+	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
+		perror("setsockopt()");
 		exit(1);
 	}
 
@@ -846,19 +856,18 @@ int main(int argc, char *argv[]) {
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
 							printf(buffer);
-						
-							if(n == -1) {
-								perror("sendto()");
-								exit(1);
-							}
 
+							if(n <= 0) {
+								writeMessage(newfd, "RRQ EPD\n", 8);
+								continue;
+							}
 							pdaddrlen = sizeof(pdaddr);
 							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
 							buffer[n]= '\0';
 
-							if(n == -1) {
-								perror("recvfrom()");
-								exit(1);
+							if(n <= 0) {
+								writeMessage(newfd, "RRQ EPD\n", 8);
+								continue;
 							}
 
 							printf(buffer);
