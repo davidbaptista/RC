@@ -159,6 +159,8 @@ int main(int argc, char *argv[]) {
 	char aux[AUX_SIZE];
 	char buffer[BUFFER_SIZE];
 	char arg1[16], arg2[16], arg3[16], arg4[128], arg5[16];
+	char sockIP[32];
+	int sockPort;
 	int ret;
 	int counter;
 	int asudpfd, pdfd, astcpfd, newfd;
@@ -240,6 +242,10 @@ int main(int argc, char *argv[]) {
 			asudpaddrlen = sizeof(asudpaddr);
 			n = recvfrom(asudpfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asudpaddr, &asudpaddrlen);
 
+			//get the IP and Port
+			strcpy(sockIP, inet_ntoa(asudpaddr.sin_addr));
+			sockPort = ntohs(asudpaddr.sin_port);
+
 			buffer[n] = '\0';
 
 			if(n == -1) {
@@ -248,6 +254,18 @@ int main(int argc, char *argv[]) {
 			}
 
 			sscanf(buffer, "%s ", arg1);
+
+			if(verbose){
+				if(strcmp(arg1, "REG") == 0) {
+					printf("Received request from IP = %s, Port = %d\nRequest Description: register user\n", sockIP, sockPort);
+				}
+				else if(strcmp(arg1, "UNR") == 0) {
+					printf("Received request from IP = %s, Port = %d\nRequest Description: unregister user\n", sockIP, sockPort);
+				}
+				else if(strcmp(arg1, "VLD") == 0) {
+					printf("Received request from IP = %s, Port = %d\nRequest Description: Validate operation\n", sockIP, sockPort);
+				}
+			}
 
 			if(strcmp(arg1, "REG") == 0) {
 				n = sscanf(buffer, "%s %s %s %s %s", arg1, arg2, arg3, arg4, arg5);
@@ -649,6 +667,8 @@ int main(int argc, char *argv[]) {
 			else if(pid == 0) {
 				close(astcpfd);
 
+				char sockIP[16];
+				int sockPort;
 				char RID[5];
 				char UID[6];
 				char Fop[2];
@@ -656,6 +676,16 @@ int main(int argc, char *argv[]) {
 				int VC;
 				int TID;
 				int potentialVC;
+				struct sockaddr_in addr;
+				socklen_t addrsize = sizeof(struct sockaddr_in);
+
+				if(getpeername(newfd, (struct sockaddr*)&addr, &addrsize) != 0) {
+					perror("getpeername()");
+					exit(1);
+				}
+
+				strcpy(sockIP, inet_ntoa(addr.sin_addr));
+				sockPort = ntohs(addr.sin_port);
 
 				while(true) {
 					n = readMessage(newfd, buffer);
@@ -677,10 +707,6 @@ int main(int argc, char *argv[]) {
 					
 					if(strcmp(arg1, "LOG") == 0) {
 						ret = sscanf(buffer, "LOG %s %s\n", arg2, arg3);
-
-						if(verbose) {
-							//printf(buffer);
-						}
 
 						if(ret != 2 || strlen(arg2) != 5 || strlen(arg3) != 8) {
 							writeMessage(newfd, "RLO ERR\n", 8);
@@ -718,6 +744,10 @@ int main(int argc, char *argv[]) {
 							continue;
 						}
 
+						if(verbose){
+							printf("Received login command from IP = %s, Port = %d\nRequest Description: login user:%s with password:%s\n", sockIP, sockPort, arg2, arg3);
+						}
+
 						n = fread(buffer, 1, BUFFER_SIZE, fp);
 						buffer[n] = '\0';
 
@@ -750,10 +780,6 @@ int main(int argc, char *argv[]) {
 					}
 					else if(strcmp(arg1, "REQ") == 0) {
 						ret = sscanf(buffer, "REQ %s %s %s %s", arg1, arg2, arg3, arg4);
-
-						if(verbose) {
-							//printf(buffer);
-						}
 
 						if(strlen(arg1) != 5 || strlen(arg2) != 4) {
 							writeMessage(newfd, "RRQ ERR\n", 8);
@@ -801,6 +827,24 @@ int main(int argc, char *argv[]) {
 								writeMessage(newfd, "RRQ ERR\n", 8);
 								printf("RRQ ERR\n");
 								continue;
+							}
+
+							if(verbose){
+								if(strcmp(arg3, "L") == 0) {
+									printf("Received request from IP = %s, Port = %d\nRequest Description: list user's files\n", sockIP, sockPort);
+								}
+								else if(strcmp(arg3, "R") == 0) {
+									printf("Received request from IP = %s, Port = %d\nRequest Description: retrieve the contents of the file: %s\n", sockIP, sockPort, arg4);
+								}
+								else if(strcmp(arg3, "U") == 0) {
+									printf("Received request from IP = %s, Port = %d\nRequest Description: upload the file: %s\n", sockIP, sockPort, arg4);
+								}
+								else if(strcmp(arg3, "D") == 0) {
+									printf("Received request from IP = %s, Port = %d\nRequest Description: delete the file: %s\n", sockIP, sockPort, arg4);
+								}
+								else if(strcmp(arg3, "X") == 0) {
+									printf("Received request from IP = %s, Port = %d\nRequest Description: removal of all user's files and directories\n", sockIP, sockPort);
+								}
 							}
 
 							sprintf(filename, "AS/USERS/%s/%s_reg.txt", arg1, arg1);
@@ -890,6 +934,10 @@ int main(int argc, char *argv[]) {
 						if(ret == 3 && strlen(arg1) == 5 && strlen(arg2) == 4) {
 							if(userExists(arg1) && userIsLoggedIn(arg1) && strcmp(arg1, UID) == 0 && strcmp(arg2, RID) == 0 && potentialVC == VC) {
 								TID = rand() % 10000;
+
+								if(verbose){
+									printf("Received Authetication command from IP = %s, Port = %d\nRequest Description: user:%s RID:%s VC:%s\n", sockIP, sockPort, arg1, arg2, arg3);
+								}
 
 								sprintf(filename, "AS/USERS/%s/%s_tid.txt", UID, UID);
 
