@@ -215,16 +215,21 @@ int main(int argc, char *argv[]) {
 		else if(pid == 0) {
 			close(fsfd);
 
-			char sockname[32];
+			char request[32];
+			char sockIP[32];
+			int sockPort;
 			struct sockaddr_in addr;
 			socklen_t addrsize = sizeof(struct sockaddr_in);
 
+			//return address info about the remote side of the connection
 			if(getpeername(newfd, (struct sockaddr*)&addr, &addrsize) != 0) {
 				perror("getpeername()");
 				exit(1);
 			}
 
-			strcpy(sockname, inet_ntoa(addr.sin_addr));
+			//get the IP and Port
+			strcpy(sockIP, inet_ntoa(addr.sin_addr));
+			sockPort = ntohs(addr.sin_port);
 
 			n = readMessage(newfd, buffer, 15);
 
@@ -242,11 +247,9 @@ int main(int argc, char *argv[]) {
 
 			sscanf(buffer, "%s %s %s", command, UID, TID);
 
-			if(verbose) {
-				printf(buffer);
-				printf(" ");
-			}
-			
+			//variable request used in the verbose mode
+			strcpy(request,command);
+
 			if(strlen(UID) == 5 && strlen(TID) == 4) {
 				bool hasFname = false;
 				if(strcmp(command, "LST") == 0) {
@@ -296,8 +299,26 @@ int main(int argc, char *argv[]) {
 
 					possibleFName[nbytes-1] = '\0';
 
-					puts(possibleFName);
 				}
+
+				if(verbose){
+					if(strcmp(request, "LST") == 0) {
+						printf("Received request from IP = %s, Port = %d\nRequest Description: list user's files\n", sockIP, sockPort);
+					}
+					else if(strcmp(request, "RTV") == 0) {
+						printf("Received request from IP = %s, Port = %d\nRequest Description: retrieve the contents of the file with name %s\n", sockIP, sockPort, possibleFName);
+					}
+					else if(strcmp(request, "UPL") == 0) {
+						printf("Received request from IP = %s, Port = %d\nRequest Description: upload the file with name %s\n", sockIP, sockPort, possibleFName);
+					}
+					else if(strcmp(request, "DEL") == 0) {
+						printf("Received request from IP = %s, Port = %d\nRequest Description: detelte the file with name %s\n", sockIP, sockPort, possibleFName);
+					}
+					else if(strcmp(request, "REM") == 0) {
+						printf("Received request from IP = %s, Port = %d\nRequest Description: removal of all user's files and directories\n", sockIP, sockPort);
+					}
+				}
+			
 
 				sprintf(buffer, "VLD %s %s\n", UID, TID);
 				
@@ -307,10 +328,7 @@ int main(int argc, char *argv[]) {
 					perror("sendto()");
 					break;
 				}
-
-				if(verbose) {
-					printf(buffer);
-				}
+				
 				n = recvfrom(asfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asaddr, &asaddrlen);
 
 				if(n < 0) {
@@ -322,9 +340,6 @@ int main(int argc, char *argv[]) {
 
 				sscanf(buffer, "CNF %s %s %c %s", UID, TID, &Fop, FName);
 				
-				if(verbose) {
-					printf(buffer);
-				}
 
 				if(hasFname && strcmp(FName, possibleFName) != 0) {
 					Fop = 'E';
@@ -389,9 +404,6 @@ int main(int argc, char *argv[]) {
 					}
 					writeMessage(newfd, buffer, strlen(buffer));
 
-					if(verbose) {
-						printf(buffer);
-					}
 				}
 				else if(Fop == 'R') {
 					d = opendir(dirname);
@@ -403,9 +415,6 @@ int main(int argc, char *argv[]) {
 						puts(buffer);
 						if(fp == NULL) {
 							sprintf(buffer, "RRT EOF\n");
-							if(verbose) {
-								printf(buffer);
-							}
 							writeMessage(newfd, buffer, strlen(buffer));
 							break;
 						}
@@ -431,10 +440,6 @@ int main(int argc, char *argv[]) {
 
 						writeMessage(newfd, buffer, strlen(buffer));
 
-						if(verbose) {
-							printf("Sending file %s to user\n", FName);
-						}
-
 						nbytes = 0;
 						nread = 0;
 	
@@ -451,17 +456,10 @@ int main(int argc, char *argv[]) {
 							break;
 						}
 
-						if(verbose) {
-							printf("File %s was sent!\n", FName);
-						}
 					}
 					else {
 						sprintf(buffer, "RRT NOK\n");
 						writeMessage(newfd, buffer, strlen(buffer));
-
-						if(verbose) {
-							printf(buffer);
-						}
 					}
 				}
 				else if(Fop == 'D') {
@@ -578,7 +576,6 @@ int main(int argc, char *argv[]) {
 					fclose(fp);
 
 					writeMessage(newfd, "RUP OK\n", 7);
-					printf("RUP OK\n");
 				}
 				else if(Fop == 'X') {
 					d = opendir(dirname);
@@ -604,16 +601,13 @@ int main(int argc, char *argv[]) {
 							}
 
 							writeMessage(newfd, "RRM OK\n", (long) 7);
-							printf("RRM OK\n");
 						}
 						else {
 							writeMessage(newfd, "RRM ERR\n", (long)8);
-							printf("RRM ERR\n");
 						}
 					}
 					else {
 						writeMessage(newfd, "RRM OK\n", (long)7);
-						printf("RRM OK\n");
 					}
 				}
 				else if(Fop == 'E') {
