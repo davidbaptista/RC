@@ -26,7 +26,7 @@ run-fs:
 	./FS/fs -q 59002 -n 193.136.128.108 -p 58002 -v
 
 run-as:
-	./AS/as -p 58003 -v
+	./AS/as -p 58002 -v
 
 clean:
 	-rm $(EXECUTABLES)

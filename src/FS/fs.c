@@ -75,7 +75,7 @@ long writeMessage(int fd, char *msg, long int msgSize) {
 		nwritten = write(fd, ptr, nleft);
 
 		if(nwritten <= 0) {
-			puts("write()");
+			perror("write()");
 			exit(1);
 		}
 		ntotal += nwritten;
@@ -96,7 +96,7 @@ long readMessage(int fd, char *msg, long int msgSize) {
 		nread = read(fd, ptr, nleft);
 
 		if(nread == -1) {
-			puts("read()");
+			perror("read()");
 			exit(1);
 		}
 		else if(nread == 0) {
@@ -306,19 +306,18 @@ int main(int argc, char *argv[]) {
 						printf("Received request from IP = %s, Port = %d\nRequest Description: list user's files\n", sockIP, sockPort);
 					}
 					else if(strcmp(request, "RTV") == 0) {
-						printf("Received request from IP = %s, Port = %d\nRequest Description: retrieve the contents of the file with name %s\n", sockIP, sockPort, possibleFName);
+						printf("Received request from IP = %s, Port = %d\nRequest Description: retrieve the contents of the file: %s\n", sockIP, sockPort, possibleFName);
 					}
 					else if(strcmp(request, "UPL") == 0) {
-						printf("Received request from IP = %s, Port = %d\nRequest Description: upload the file with name %s\n", sockIP, sockPort, possibleFName);
+						printf("Received request from IP = %s, Port = %d\nRequest Description: upload the file: %s\n", sockIP, sockPort, possibleFName);
 					}
 					else if(strcmp(request, "DEL") == 0) {
-						printf("Received request from IP = %s, Port = %d\nRequest Description: detelte the file with name %s\n", sockIP, sockPort, possibleFName);
+						printf("Received request from IP = %s, Port = %d\nRequest Description: delete the file: %s\n", sockIP, sockPort, possibleFName);
 					}
 					else if(strcmp(request, "REM") == 0) {
 						printf("Received request from IP = %s, Port = %d\nRequest Description: removal of all user's files and directories\n", sockIP, sockPort);
 					}
 				}
-			
 
 				sprintf(buffer, "VLD %s %s\n", UID, TID);
 				
@@ -412,7 +411,6 @@ int main(int argc, char *argv[]) {
 					if(d) {
 						sprintf(buffer, "%s/%s", dirname, FName);
 						fp = fopen(buffer, "rb");
-						puts(buffer);
 						if(fp == NULL) {
 							sprintf(buffer, "RRT EOF\n");
 							writeMessage(newfd, buffer, strlen(buffer));
