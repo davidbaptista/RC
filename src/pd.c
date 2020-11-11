@@ -67,12 +67,12 @@ int main(int argc, char *argv[]) {
 
     parseArgs(argc, argv);
 
-    asfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
+    asfd = socket(AF_INET,SOCK_DGRAM,0); // client socket
     if(asfd == -1) {
         exit(1);
     }
 
-	pdfd = socket(AF_INET, SOCK_DGRAM, 0);
+	pdfd = socket(AF_INET, SOCK_DGRAM, 0); // server socket
 	if(pdfd == -1) {
 		exit(1);
 	}
@@ -94,6 +94,8 @@ int main(int argc, char *argv[]) {
 	if(getaddrinfo(pdIP, pdPort, &pdhints, &pdres) != 0) {
 		exit(1);
 	}
+
+
 
 	if(bind(pdfd, pdres->ai_addr, pdres->ai_addrlen) == -1) {
         perror("bind()");

@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	tv.tv_sec = 4;
+	tv.tv_sec = 1;
 	tv.tv_usec = 1;
 	if (setsockopt(pdfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
 		perror("setsockopt()");
