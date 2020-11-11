@@ -80,7 +80,6 @@ int main(int argc, char *argv[]) {
     memset(&ashints, 0, sizeof(ashints));
     ashints.ai_family=AF_INET; // IPv4
     ashints.ai_socktype=SOCK_DGRAM; // UDP
-	ashints.ai_flags=AI_PASSIVE;
 
 	memset(&pdhints, 0, sizeof(pdhints));
     pdhints.ai_family=AF_INET; // IPv4

@@ -194,7 +194,6 @@ int main(int argc, char *argv[]) {
 	memset(&pdhints, 0, sizeof(pdhints));
     pdhints.ai_family=AF_INET;
     pdhints.ai_socktype=SOCK_DGRAM; 
-	pdhints.ai_flags = AI_PASSIVE;
 
 	memset(&astcphints, 0, sizeof(astcphints));
     astcphints.ai_family=AF_INET;
@@ -239,7 +238,6 @@ int main(int argc, char *argv[]) {
 
 		if(FD_ISSET(asudpfd, &fds)) {
 			asudpaddrlen = sizeof(asudpaddr);
-
 			n = recvfrom(asudpfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&asudpaddr, &asudpaddrlen);
 
 			buffer[n] = '\0';
@@ -247,10 +245,6 @@ int main(int argc, char *argv[]) {
 			if(n == -1) {
 				perror("recvfrom()");
 				exit(1);
-			}
-
-			if(verbose) {
-				//printf(buffer);
 			}
 
 			sscanf(buffer, "%s ", arg1);
@@ -829,6 +823,8 @@ int main(int argc, char *argv[]) {
 							char pdPort[8];
 							sscanf(buffer, "%s %s", pdIP, pdPort);
 
+							puts(buffer);
+
 							if((getaddrinfo(pdIP, pdPort, &pdhints, &pdres)) != 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
 								puts("RRQ EPD");
@@ -849,16 +845,21 @@ int main(int argc, char *argv[]) {
 							strcpy(Fop, arg3);
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
-
 							printf(buffer);
 						
+							if(n == -1) {
+								perror("sendto()");
+								exit(1);
+							}
+
+							pdaddrlen = sizeof(pdaddr);
+							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
+							buffer[n]= '\0';
+
 							if(n == -1) {
 								perror("recvfrom()");
 								exit(1);
 							}
-
-							n = recvfrom(pdfd, buffer, BUFFER_SIZE, 0, (struct sockaddr*)&pdaddr, &pdaddrlen);
-							buffer[n]= '\0';
 
 							printf(buffer);
 
@@ -871,8 +872,6 @@ int main(int argc, char *argv[]) {
 								writeMessage(newfd, "RRQ EUSER\n", 10);
 								printf("RRQ EUSER\n");
 							}
-
-							freeaddrinfo(pdres);
 						}
 						else {
 							writeMessage(newfd, "RRQ EFOP\n", 9);
@@ -961,6 +960,7 @@ int main(int argc, char *argv[]) {
 	freeaddrinfo(asudpres);
 	freeaddrinfo(astcpres);
 	close(astcpfd);
+	close(pdfd);
 	close(asudpfd);
 	exit(0);
 }
