@@ -95,22 +95,22 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-
-
 	if(bind(pdfd, pdres->ai_addr, pdres->ai_addrlen) == -1) {
         perror("bind()");
 		exit(1);
 	}
 
-	bool reg = false; // checks whether or not there already is a registered user
+	bool reg = false; // flag controls whether or not there already is a registered user
 
     while (true){
 		FD_ZERO(&fds);
     	FD_SET(pdfd, &fds);
 		FD_SET(0, &fds);
-        counter = select(pdfd + 1, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
 
+		// selects between user input in stdin and AS 
+        counter = select(pdfd + 1, &fds, (fd_set *) NULL, (fd_set *) NULL, (struct timeval *) NULL);
         if (counter <= 0) {
+			perror("select()");
             exit(1);
         }
 		
@@ -154,6 +154,7 @@ int main(int argc, char *argv[]) {
 
                     n = sendto(asfd, msg, strlen(msg), 0, asres->ai_addr, asres->ai_addrlen);
                     if(n == -1) {
+						perror("sendto()");
                         exit(1);
                     }
 
@@ -172,7 +173,9 @@ int main(int argc, char *argv[]) {
 						break;
                     }
 					else {
-						puts("Unregister was not successful");
+						reg = false;
+						puts("There was no user folder in the AS. Closing PD");
+						break;
 					}
                 }
 				else {
@@ -184,6 +187,7 @@ int main(int argc, char *argv[]) {
 
                 n = sendto(asfd, msg, strlen(msg), 0, asres->ai_addr, asres->ai_addrlen);
                 if(n == -1) {
+					perror("sendto()");
                     exit(1);
                 }
 
@@ -192,6 +196,7 @@ int main(int argc, char *argv[]) {
                 buffer[n] = '\0';
 
                 if(n == -1) {
+					perror("recvfrom()");
                     exit(1);
                 }
 
@@ -203,13 +208,12 @@ int main(int argc, char *argv[]) {
                 }
 				else {
 					reg = false;
-					break;
 					puts("Registration was not successful");
 				}
             }
 			else {
 				if(strcmp(command, "exit") == 0) {
-					puts("Closing PD");
+					puts("There was no user folder in the AS. Closing PD");
 					break;
 				}
 				else {
