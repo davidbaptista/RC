@@ -37,9 +37,10 @@ char *fsPort = NULL;
 char *asIP = NULL;
 char *asPort = NULL;
 
-bool verbose = false;
+bool verbose = false;	// flag determing whether status messages are displayed on the terminal
 bool cycle = true;
 
+//  argument parsing function
 static void parseArgs(long argc, char* const argv[]) {
     char c;
 
@@ -65,6 +66,7 @@ static void parseArgs(long argc, char* const argv[]) {
     }
 }
 
+// writes the message to a given TCP socket and returns the total number of bytes written
 long writeMessage(int fd, char *msg, long int msgSize) {
 	ssize_t nleft, nwritten, ntotal = 0;
 	char *ptr;
@@ -86,6 +88,7 @@ long writeMessage(int fd, char *msg, long int msgSize) {
 	return ntotal;
 } 
 
+// reads the message from a given TCP socket and returns the total number of bytes read
 long readMessage(int fd, char *msg, long int msgSize) {
 	ssize_t nleft, nread, ntotal = 0;
 	char *ptr;
@@ -145,7 +148,7 @@ int main(int argc, char *argv[]) {
 	char aux[AUX_SIZE]; // used for building the list buffer
 	long size;
 	int i = 0;
-	bool dup = false;
+	bool dup = false;	// to check duplicated files
 
     parseArgs(argc, argv);
 
@@ -156,12 +159,14 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-    asfd = socket(AF_INET,SOCK_DGRAM,0); // UDP socket
+	// UDP client socket to communicate with AS
+    asfd = socket(AF_INET,SOCK_DGRAM,0); 
     if(asfd == -1) {
 		perror("UDP socket()");
         exit(1);
     }
 
+	// TCP server socket, listens to user requests
 	fsfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fsfd == -1) {
 		perror("TCP socket()");
@@ -193,6 +198,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	// waits for TCP requests on given port
 	if(listen(fsfd, 128) == -1) {
 		perror("listen()");
 		exit(1);
@@ -201,6 +207,7 @@ int main(int argc, char *argv[]) {
     while (true) {
 		fsaddrlen = sizeof(fsaddrlen);
 
+		// waits for a new request to accept and creates a new child process
 		do {
 			newfd = accept(fsfd, (struct sockaddr*)&fsaddr, &fsaddrlen);
 		} while(newfd == -1 && errno == EINTR);
@@ -223,7 +230,7 @@ int main(int argc, char *argv[]) {
 			struct sockaddr_in addr;
 			socklen_t addrsize = sizeof(struct sockaddr_in);
 
-			//return address info about the remote side of the connection
+			// returns address info about the remote side of the connection
 			if(getpeername(newfd, (struct sockaddr*)&addr, &addrsize) != 0) {
 				perror("getpeername()");
 				exit(1);
@@ -233,6 +240,7 @@ int main(int argc, char *argv[]) {
 			strcpy(sockIP, inet_ntoa(addr.sin_addr));
 			sockPort = ntohs(addr.sin_port);
 
+			// reads only the command from the user, the UID and TID
 			n = readMessage(newfd, buffer, 15);
 
 			if(n < 0) {
@@ -242,6 +250,7 @@ int main(int argc, char *argv[]) {
 
 			if(n != 15) {
 				printf("Unexpected error\n");
+				writeMessage(newfd, "ERR\n", 4);
 				exit(1);
 			}
 
@@ -252,6 +261,7 @@ int main(int argc, char *argv[]) {
 			//variable request used in the verbose mode
 			strcpy(request,command);
 
+			// validates the size of UID and TID, and writes the appropriate command name to command
 			if(strlen(UID) == 5 && strlen(TID) == 4) {
 				bool hasFname = false;
 				if(strcmp(command, "LST") == 0) {
@@ -277,6 +287,7 @@ int main(int argc, char *argv[]) {
 					break;
 				}
 
+				// reads the FName sent by the user application for comparison purposes
 				char possibleFName[32];
 				if(hasFname) {
 					ptr = possibleFName;
@@ -303,6 +314,7 @@ int main(int argc, char *argv[]) {
 
 				}
 
+				// prints to the console info about the incoming request
 				if(verbose){
 					if(strcmp(request, "LST") == 0) {
 						printf("Received request from IP = %s, Port = %d\nRequest Description: list user's files\n", sockIP, sockPort);
@@ -321,6 +333,7 @@ int main(int argc, char *argv[]) {
 					}
 				}
 
+				// validates the operation with AS
 				sprintf(buffer, "VLD %s %s\n", UID, TID);
 				
 				n = sendto(asfd, buffer, strlen(buffer), 0, asres->ai_addr, asres->ai_addrlen);
@@ -341,7 +354,7 @@ int main(int argc, char *argv[]) {
 
 				sscanf(buffer, "CNF %s %s %c %s", UID, TID, &Fop, FName);
 				
-
+				// if the file name is not the same, change Fop value so an appropriate error is sent
 				if(hasFname && strcmp(FName, possibleFName) != 0) {
 					Fop = 'E';
 				}
@@ -352,16 +365,19 @@ int main(int argc, char *argv[]) {
 					d = opendir(dirname);
 					
 					if(d) {
-						i = 0;
+						i = 0; // counts files
 						strcpy(aux, "");
 						while((dir = readdir(d)) != NULL) {
 							i++;
+							// skips current directroy and parent directroy "files"
 							if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
 								i--;
 								continue;
 							}
+
+							// opens file to get file size
 							sprintf(buffer, "%s/%s", dirname, dir->d_name);
-							fp = fopen(buffer, "rb"); // FIX LATER
+							fp = fopen(buffer, "rb");
 
 							if(fp == NULL) {
 								perror("fopen()");
@@ -372,7 +388,7 @@ int main(int argc, char *argv[]) {
 								perror("fseek()");
 								break;
 							}
-							
+
 							size = ftell(fp);
 
 							if(size < 0) {
@@ -390,7 +406,7 @@ int main(int argc, char *argv[]) {
 							}
 
 							sprintf(buffer, " %s %ld", dir->d_name, size);
-							strcat(aux, buffer);
+							strcat(aux, buffer); // builds the output string
 						}
 
 						if(i > 0) {
@@ -403,8 +419,8 @@ int main(int argc, char *argv[]) {
 					else {
 						sprintf(buffer, "RLS EOF\n");
 					}
-					writeMessage(newfd, buffer, strlen(buffer));
 
+					writeMessage(newfd, buffer, strlen(buffer));
 				}
 				else if(Fop == 'R') {
 					d = opendir(dirname);
@@ -443,6 +459,7 @@ int main(int argc, char *argv[]) {
 						nbytes = 0;
 						nread = 0;
 	
+						// sends the file to the user while reading it
 						while(nbytes < size) {
 							nread = fread(buffer, 1, BUFFER_SIZE, fp);
 							nbytes += writeMessage(newfd, buffer, nread);
@@ -455,7 +472,6 @@ int main(int argc, char *argv[]) {
 							perror("fclose()");
 							break;
 						}
-
 					}
 					else {
 						sprintf(buffer, "RRT NOK\n");
@@ -490,8 +506,10 @@ int main(int argc, char *argv[]) {
 						d = opendir(dirname);
 					}
 
-					i = 0; 
+					i = 0; // used to determine the number of files for RUP FULL
 					dup = false;
+
+					// checks if the folder has space or if the file is duplicated
 					while((dir = readdir(d)) != NULL) {
 						if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
 							i--;
@@ -526,6 +544,7 @@ int main(int argc, char *argv[]) {
 					ptr = fsize;
 					nbytes = 0;
 
+					// reads the file size 1 by 1 byte (since its number of digits can vary)
 					while(true) {
 						nread = read(newfd, ptr, 1);
 
@@ -537,6 +556,7 @@ int main(int argc, char *argv[]) {
 						}
 						nbytes += nread;
 
+						// stops reading at the space
 						if(ptr[nread-1] == ' ') {
 							break;
 						}
@@ -554,6 +574,7 @@ int main(int argc, char *argv[]) {
 					size = strtol(fsize, NULL, 10);
 					nbytes = 0;
 
+					// reads the file bytes until they reach or exceed file size (since buffer "trash" can be sent)
 					while(nbytes < size) {
 						nread = read(newfd, buffer, BUFFER_SIZE);
 						nbytes += nread;
@@ -561,6 +582,8 @@ int main(int argc, char *argv[]) {
 							break;
 						}
 
+						/*if the socket read too much (or read "trash"), adjusts nread value so only 
+						the correct number of bytes is written to local file copy */
 						if(nbytes >= size) {
 							nread -= (nbytes - size); 
 						}
@@ -582,6 +605,8 @@ int main(int argc, char *argv[]) {
 
 					if(d) {
 						bool ok = true;
+						
+						// deletes all files except . and ..
 						while((dir = readdir(d)) != NULL) {
 							if(strcmp(dir->d_name, ".") == 0 || strcmp(dir->d_name, "..") == 0) {
 								continue;
@@ -614,7 +639,7 @@ int main(int argc, char *argv[]) {
 					sprintf(buffer, "%s INV\n", command);
 					writeMessage(newfd, buffer, strlen(buffer));
 				}
-				else {
+				else { // wrong format
 					sprintf(buffer, "%s ERR\n", command);
 					writeMessage(newfd, buffer, strlen(buffer));
 				}
@@ -633,6 +658,7 @@ int main(int argc, char *argv[]) {
 		}
     }
 
+	// frees and closes
     freeaddrinfo(asres);
 	freeaddrinfo(fsres);
     close(asfd);
