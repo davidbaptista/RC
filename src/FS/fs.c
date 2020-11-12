@@ -248,12 +248,6 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 
-			if(n != 15) {
-				printf("Unexpected error\n");
-				writeMessage(newfd, "ERR\n", 4);
-				exit(1);
-			}
-
 			buffer[n-1] = '\0';
 
 			sscanf(buffer, "%s %s %s", command, UID, TID);

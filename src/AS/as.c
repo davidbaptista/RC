@@ -857,7 +857,6 @@ int main(int argc, char *argv[]) {
 							strcpy(Fop, arg3);
 
 							n = sendto(pdfd, buffer, strlen(buffer), 0, pdres->ai_addr, pdres->ai_addrlen);
-							printf(buffer);
 
 							if(n <= 0) {
 								writeMessage(newfd, "RRQ EPD\n", 8);
